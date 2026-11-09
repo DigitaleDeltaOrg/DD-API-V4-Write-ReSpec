@@ -1,0 +1,1685 @@
+openapi: 3.1.0
+info:
+  title: DD-API-V4 Write Module
+  description: |
+    Digitale Delta API V4 Write Module - Batch verwerking voor het upserten en deprecaten van data.
+    
+    Deze module voegt schrijf-functionaliteit toe aan DD API V4. Het biedt een batch-gebaseerde
+    methode voor het toevoegen, bijwerken en deprecaten van observaties, meetobjecten en parameters.
+    
+    ## Belangrijke Kenmerken
+    
+    - **Batch-verwerking per entiteit**: Afzonderlijke endpoints per entiteitstype
+    - **Asynchrone uitvoering**: Jobs worden op de achtergrond verwerkt
+    - **Eigen wrapper**: Vervangt OData-wrapper door batch-specifieke structuur
+    - **OAS 3.1**: Blijft conform OpenAPI Specification 3.1
+    - **Key Exchange**: Server genereert autoritatieve IDs en retourneert zowel client als server IDs
+    - **Per-entity job tracking**: Job status endpoints onder elke entiteit path
+    - **Single endpoint voor status en resultaten**: GET /write/{entity}/{jobId} retourneert status en (als completed) de resultaten
+  license:
+    name: CC BY 4.0
+    url: https://creativecommons.org/licenses/by/4.0/
+  version: 4.0.0
+  x-logo:
+    url: /v4/DigitaleDelta.svg
+
+servers:
+  - url: https://api.example.com/v4
+    description: Production server
+  - url: https://test-api.example.com/v4
+    description: Test server
+
+externalDocs:
+  description: Official DD API V4 Write documentation
+  url: https://digitaledeltaorg.github.io/DD-API-V4-ReSpec/20-00-write-module
+
+tags:
+  - name: Write
+    description: Batch write operations
+  - name: Observation
+    description: Observation write operations and job tracking
+  - name: FoI
+    description: Feature of Interest write operations and job tracking
+  - name: Parameter
+    description: Parameter write operations and job tracking
+
+paths:
+  /write/observation:
+    post:
+      tags:
+        - Write
+        - Observation
+      summary: Submit a batch of observation operations
+      description: |
+        Submit a batch of upsert and deprecate operations for observations only.
+        The operations are processed asynchronously and return a job ID for tracking.
+        
+        **Job status and results can be retrieved from:**
+        - GET /write/observation/{jobId}
+        
+        When the job is still processing, the response contains only status information.
+        When the job is completed, the response includes detailed operation results.
+        
+        ## Key Exchange Mechanisme
+        
+        **🔴 CRITISCHE REGEL: De client mag NOOIT de server ID dicteren**
+        De server genereert altijd zelf de server ID (als string) en retourneert deze.
+        Dit voorkomt key-conflicten tussen verschillende aanbieders en staat clients toe 
+        om elk gewenst ID-formaat voor hun eigen identifiers te gebruiken.
+        
+        **Bij INSERT (eerste keer een observatie toevoegen):**
+        - Client stuurt data met eigen `sourceId` (kan elk formaat zijn)
+        - `id` MOET afwezig zijn
+        - **Server genereert altijd zelf een server ID (string)**
+        - Response bevat zowel `sourceId` als `id`
+        
+        **Bij UPDATE/DEPRECATE (vervolgoperaties):**
+        - Client MOET de **server ID (string)** gebruiken in het `id` veld
+        - `sourceId` MOET afwezig zijn
+        - Gebruik van sourceId in update/deprecate resulteert in fout `SOURCEID_NOT_ALLOWED`
+        
+        **Voor FoI referenties:**
+        - FoI referenties MOETEN **server IDs (string)** zijn (van eerdere create operaties)
+      operationId: write.observation.submitBatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObservationBatchRequest'
+            examples:
+              insertObservation:
+                summary: Insert new observation (CREATE)
+                description: |
+                  INSERT operation: sourceId REQUIRED, id MUST be absent/null
+                  Server will return both server id and sourceId in response
+                value:
+                  operations:
+                    - operation: insert
+                      id: "op1"
+                      data:
+                        observation:
+                          sourceId: "client-obs-001"
+                          type: "measure"
+                          resultTime: "2024-01-15T10:00:00Z"
+                          phenomenonTime:
+                            begin: "2024-01-15T10:00:00Z"
+                            end: "2024-01-15T10:00:00Z"
+                          parameter:
+                            parameter/waarnemingssoort: "WATHTE"
+                          foi:
+                            id: "550e8400-e29b-41d4-a716-446655440002"
+                          result:
+                            id: "result-001"
+                            measure:
+                              uom: "m"
+                              value: 1.5
+                          modifiedOn: "2024-01-15T10:00:00Z"
+              updateObservation:
+                summary: Update existing observation (UPDATE)
+                description: |
+                  UPDATE operation: id (server) REQUIRED, sourceId MUST be absent/null
+                value:
+                  operations:
+                    - operation: update
+                      id: "op2"
+                      data:
+                        observation:
+                          id: "550e8400-e29b-41d4-a716-446655440001"
+                          type: "measure"
+                          resultTime: "2024-01-15T10:00:00Z"
+                          phenomenonTime:
+                            begin: "2024-01-15T10:00:00Z"
+                            end: "2024-01-15T10:00:00Z"
+                          parameter:
+                            parameter/waarnemingssoort: "WATHTE"
+                          foi:
+                            id: "550e8400-e29b-41d4-a716-446655440002"
+                          result:
+                            id: "result-001"
+                            measure:
+                              uom: "m"
+                              value: 1.6
+                          modifiedOn: "2024-01-15T10:00:00Z"
+              deprecateObservation:
+                summary: Deprecate observation
+                description: |
+                  DEPRECATE operation: id (server) REQUIRED, sourceId MUST be absent/null
+                value:
+                  operations:
+                    - operation: deprecate
+                      id: "op3"
+                      data:
+                        id: "550e8400-e29b-41d4-a716-446655440001"
+                        reason: "Foutieve meting"
+      responses:
+        '202':
+          description: Batch accepted for processing
+          headers:
+            Location:
+              description: URL to check job status and results
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WriteJobStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '413':
+          description: Request entity too large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '415':
+          description: Unsupported media type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /write/observation/{jobId}:
+    get:
+      tags:
+        - Observation
+      summary: Get observation job status and results
+      description: |
+        Retrieve the current status of an observation batch job.
+        
+        When the job is still queued or processing, the response contains only status information.
+        When the job is completed (or failed), the response includes detailed operation results and any errors.
+        
+        The job status can be:
+        - `queued`: Job is waiting to be processed
+        - `processing`: Job is being processed
+        - `completed`: Job has finished (successfully or with errors) - includes operation results
+        - `failed`: Job failed before processing could start - includes error details
+      operationId: write.observation.getJob
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          description: Unique identifier of the observation job
+          schema:
+            type: string
+            
+      responses:
+        '200':
+          description: Job status and results (if completed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WriteJobStatus'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /write/foi:
+    post:
+      tags:
+        - Write
+        - FoI
+      summary: Submit a batch of FoI operations
+      description: |
+        Submit a batch of upsert and deprecate operations for Features of Interest only.
+        The operations are processed asynchronously and return a job ID for tracking.
+        
+        **Job status and results can be retrieved from:**
+        - GET /write/foi/{jobId}
+        
+        ## Key Exchange Mechanisme
+        
+        **🔴 CRITISCHE REGEL: De client mag NOOIT de server ID dicteren**
+        De server genereert altijd zelf de server ID (als string) en retourneert deze.
+        
+        **Bij INSERT:** Client stuurt FoI met eigen `sourceId` (kan elk formaat zijn), 
+        **server genereert altijd zelf een server ID (string)**, retourneert sourceId + id
+        **Bij UPDATE/DEPRECATE:** Client MOET de **server ID (string)** gebruiken, sourceId MOET afwezig zijn
+      operationId: write.foi.submitBatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FoIBatchRequest'
+            examples:
+              insertFoi:
+                summary: Insert new FoI (CREATE)
+                description: |
+                  INSERT operation: sourceId REQUIRED, id MUST be absent/null
+                  Server will return both server id and sourceId in response
+                value:
+                  operations:
+                    - operation: insert
+                      id: "op1"
+                      data:
+                        foi:
+                          sourceId: "client-foi-001"
+                          type: "http://definities.pdok.nl/def/cbsgb/1.0/id/datasetdefinitie/Top10NL"
+                          name: "Meetlocatie Amsterdam"
+                          organisation: "RWS"
+                          code: "LOC001"
+                          description: "Meetlocatie Amsterdam"
+                          location: "https://pdok.nl"
+                          geometry:
+                            type: "Point"
+                            coordinates: [4.9, 52.37]
+              updateFoi:
+                summary: Update existing FoI (UPDATE)
+                description: |
+                  UPDATE operation: id (server) REQUIRED, sourceId MUST be absent/null
+                value:
+                  operations:
+                    - operation: update
+                      id: "op2"
+                      data:
+                        foi:
+                          id: "550e8400-e29b-41d4-a716-446655440002"
+                          type: "http://definities.pdok.nl/def/cbsgb/1.0/id/datasetdefinitie/Top10NL"
+                          name: "Meetlocatie Amsterdam Centraal"
+                          organisation: "RWS"
+                          code: "LOC001"
+                          description: "Meetlocatie Amsterdam Centraal Station"
+                          location: "https://pdok.nl"
+                          geometry:
+                            type: "Point"
+                            coordinates: [4.9, 52.37]
+              deprecateFoi:
+                summary: Deprecate FoI
+                description: |
+                  DEPRECATE operation: id (server) REQUIRED, sourceId MUST be absent/null
+                value:
+                  operations:
+                    - operation: deprecate
+                      id: "op3"
+                      data:
+                        id: "550e8400-e29b-41d4-a716-446655440003"
+                        reason: "Locatie niet meer in gebruik"
+      responses:
+        '202':
+          description: Batch accepted for processing
+          headers:
+            Location:
+              description: URL to check job status and results
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WriteJobStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '413':
+          description: Request entity too large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /write/foi/{jobId}:
+    get:
+      tags:
+        - FoI
+      summary: Get FoI job status and results
+      description: |
+        Retrieve the current status of a FoI batch job.
+        
+        When the job is still queued or processing, the response contains only status information.
+        When the job is completed (or failed), the response includes detailed operation results and any errors.
+      operationId: write.foi.getJob
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          description: Unique identifier of the FoI job
+          schema:
+            type: string
+            
+      responses:
+        '200':
+          description: Job status and results (if completed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WriteJobStatus'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /write/parameter:
+    post:
+      tags:
+        - Write
+        - Parameter
+      summary: Submit a batch of parameter operations
+      description: |
+        Submit a batch of upsert operations for parameters only.
+        Note: Parameters cannot be deprecated, only upserted.
+        The operations are processed asynchronously and return a job ID for tracking.
+        
+        **Job status and results can be retrieved from:**
+        - GET /write/parameter/{jobId}
+        
+        ## Key Exchange Mechanisme
+        
+        **🔴 CRITISCHE REGEL: De client mag NOOIT de server ID dicteren**
+        De server genereert altijd zelf de server ID (als string) en retourneert deze.
+        
+        **Bij INSERT:** Client stuurt parameter met eigen `sourceId` (kan elk formaat zijn), 
+        **server genereert altijd zelf een server ID (string)**, retourneert sourceId + id
+        **Bij UPDATE:** Client MOET de **server ID (string)** gebruiken, sourceId MOET afwezig zijn
+      operationId: write.parameter.submitBatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParameterBatchRequest'
+            examples:
+              insertParameter:
+                summary: Insert new parameter (CREATE)
+                description: |
+                  INSERT operation: sourceId REQUIRED, id MUST be absent/null
+                  Server will return both server id and sourceId in response
+                value:
+                  operations:
+                    - operation: insert
+                      id: "op1"
+                      data:
+                        parameter:
+                          sourceId: "client-param-001"
+                          name: "Waterhoogte"
+                          definition: "http://definities.pdok.nl/def/imkl/1.0/id/waarnemingssoort/WATHTE"
+              updateParameter:
+                summary: Update existing parameter (UPDATE)
+                description: |
+                  UPDATE operation: id (server) REQUIRED, sourceId MUST be absent/null
+                value:
+                  operations:
+                    - operation: update
+                      id: "op2"
+                      data:
+                        parameter:
+                          id: "550e8400-e29b-41d4-a716-446655440004"
+                          name: "Waterhoogte (herzien)"
+                          definition: "http://definities.pdok.nl/def/imkl/1.0/id/waarnemingssoort/WATHTE"
+      responses:
+        '202':
+          description: Batch accepted for processing
+          headers:
+            Location:
+              description: URL to check job status and results
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WriteJobStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '413':
+          description: Request entity too large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /write/parameter/{jobId}:
+    get:
+      tags:
+        - Parameter
+      summary: Get parameter job status and results
+      description: |
+        Retrieve the current status of a parameter batch job.
+        
+        When the job is still queued or processing, the response contains only status information.
+        When the job is completed (or failed), the response includes detailed operation results and any errors.
+      operationId: write.parameter.getJob
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          description: Unique identifier of the parameter job
+          schema:
+            type: string
+            
+      responses:
+        '200':
+          description: Job status and results (if completed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WriteJobStatus'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  schemas:
+    # ========================================================================
+    # Write Module Specific Schemas
+    # ========================================================================
+    
+    ObservationBatchRequest:
+      title: Observation Batch Request
+      type: object
+      required:
+        - operations
+      description: Batch request for observation operations
+      properties:
+        operations:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          description: Array of operations to be processed in this batch
+          items:
+            $ref: '#/components/schemas/WriteOperationObservation'
+        options:
+          $ref: '#/components/schemas/BatchOptions'
+
+    FoIBatchRequest:
+      title: FoI Batch Request
+      type: object
+      required:
+        - operations
+      description: Batch request for FoI operations
+      properties:
+        operations:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          description: Array of operations to be processed in this batch
+          items:
+            $ref: '#/components/schemas/WriteOperationFoI'
+        options:
+          $ref: '#/components/schemas/BatchOptions'
+
+    ParameterBatchRequest:
+      title: Parameter Batch Request
+      type: object
+      required:
+        - operations
+      description: Batch request for parameter operations
+      properties:
+        operations:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          description: Array of operations to be processed in this batch
+          items:
+            $ref: '#/components/schemas/WriteOperationParameter'
+        options:
+          $ref: '#/components/schemas/BatchOptions'
+
+    WriteOperationObservation:
+      title: Write Operation for Observation
+      type: object
+      required:
+        - operation
+        - data
+      description: |
+        Operation for observation entity.
+        
+        **Key Exchange Rules:**
+        - INSERT: sourceId REQUIRED, id MUST be absent/null
+        - UPDATE/DEPRECATE: id REQUIRED, sourceId MUST be absent/null
+      properties:
+        operation:
+          type: string
+          enum: [insert, update, deprecate]
+          description: The type of operation to perform (insert, update, or deprecate)
+        data:
+          type: object
+          description: The data for this operation
+          oneOf:
+            - $ref: '#/components/schemas/CreateObservationData'
+            - $ref: '#/components/schemas/UpdateObservationData'
+            - $ref: '#/components/schemas/DeprecateObservationData'
+          discriminator:
+            propertyName: operation
+            mapping:
+              insert: '#/components/schemas/CreateObservationData'
+              update: '#/components/schemas/UpdateObservationData'
+              deprecate: '#/components/schemas/DeprecateObservationData'
+        id:
+          type: string
+          maxLength: 100
+          description: Optional unique identifier for this operation within the batch
+
+    WriteOperationFoI:
+      title: Write Operation for FoI
+      type: object
+      required:
+        - operation
+        - data
+      description: |
+        Operation for FoI entity.
+        
+        **Key Exchange Rules:**
+        - INSERT: sourceId REQUIRED, id MUST be absent/null
+        - UPDATE/DEPRECATE: id REQUIRED, sourceId MUST be absent/null
+      properties:
+        operation:
+          type: string
+          enum: [insert, update, deprecate]
+          description: The type of operation to perform (insert, update, or deprecate)
+        data:
+          type: object
+          description: The data for this operation
+          oneOf:
+            - $ref: '#/components/schemas/CreateFoiData'
+            - $ref: '#/components/schemas/UpdateFoiData'
+            - $ref: '#/components/schemas/DeprecateFoiData'
+          discriminator:
+            propertyName: operation
+            mapping:
+              insert: '#/components/schemas/CreateFoiData'
+              update: '#/components/schemas/UpdateFoiData'
+              deprecate: '#/components/schemas/DeprecateFoiData'
+        id:
+          type: string
+          maxLength: 100
+          description: Optional unique identifier for this operation within the batch
+
+    WriteOperationParameter:
+      title: Write Operation for Parameter
+      type: object
+      required:
+        - operation
+        - data
+      description: |
+        Operation for parameter entity.
+        
+        **Key Exchange Rules:**
+        - INSERT: sourceId REQUIRED, id MUST be absent/null
+        - UPDATE: id REQUIRED, sourceId MUST be absent/null
+        
+        Note: Parameters typically don't support deprecate operations.
+      properties:
+        operation:
+          type: string
+          enum: [insert, update]
+          description: The type of operation to perform (insert or update for parameters)
+        data:
+          type: object
+          description: The data for this operation
+          oneOf:
+            - $ref: '#/components/schemas/CreateParameterData'
+            - $ref: '#/components/schemas/UpdateParameterData'
+          discriminator:
+            propertyName: operation
+            mapping:
+              insert: '#/components/schemas/CreateParameterData'
+              update: '#/components/schemas/UpdateParameterData'
+        id:
+          type: string
+          maxLength: 100
+          description: Optional unique identifier for this operation within the batch
+
+    CreateObservationData:
+      title: Create Observation Data
+      type: object
+      required:
+        - observation
+      description: Data for creating a new observation (INSERT)
+      properties:
+        observation:
+          allOf:
+            - $ref: '#/components/schemas/DigitaleDelta.Observation'
+            - type: object
+              required:
+                - sourceId
+                - type
+                - resultTime
+                - phenomenonTime
+                - parameter
+                - modifiedOn
+              properties:
+                sourceId:
+                  type: string
+                  description: Client's identifier for the new observation (REQUIRED for CREATE)
+                id:
+                  type: string
+                  nullable: true
+                  description: MUST be null or absent for CREATE operations
+                clientId:
+                  type: string
+                  nullable: true
+                  deprecated: true
+                  description: Deprecated - use sourceId instead
+
+    UpdateObservationData:
+      title: Update Observation Data
+      type: object
+      required:
+        - observation
+      description: Data for updating an existing observation (UPDATE)
+      properties:
+        observation:
+          allOf:
+            - $ref: '#/components/schemas/DigitaleDelta.Observation'
+            - type: object
+              required:
+                - id
+                - type
+                - resultTime
+                - phenomenonTime
+                - parameter
+                - modifiedOn
+              properties:
+                id:
+                  type: string
+                  description: Server identifier for the observation (REQUIRED for UPDATE/DEPRECATE)
+                sourceId:
+                  type: string
+                  nullable: true
+                  description: MUST be null or absent for UPDATE operations
+                clientId:
+                  type: string
+                  nullable: true
+                  deprecated: true
+                  description: Deprecated - not used for UPDATE
+
+    UpsertObservationData:
+      title: Upsert Observation Data
+      type: object
+      description: Data for upserting an observation (CREATE or UPDATE)
+      oneOf:
+        - $ref: '#/components/schemas/CreateObservationData'
+        - $ref: '#/components/schemas/UpdateObservationData'
+      discriminator:
+        propertyName: observation
+        mapping:
+          sourceId: '#/components/schemas/CreateObservationData'
+          id: '#/components/schemas/UpdateObservationData'
+
+    DeprecateObservationData:
+      title: Deprecate Observation Data
+      type: object
+      required:
+        - id
+        - reason
+      description: Data for deprecating an observation
+      properties:
+        id:
+          type: string
+          description: Server ID (string) of the observation to deprecate (MUST be server-generated)
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: The reason for deprecation
+        effectiveDate:
+          type: string
+          format: date-time
+          description: Date when the deprecation takes effect
+
+    CreateFoiData:
+      title: Create FoI Data
+      type: object
+      required:
+        - foi
+      description: Data for creating a new FoI (INSERT)
+      properties:
+        foi:
+          allOf:
+            - $ref: '#/components/schemas/DigitaleDelta.Foi'
+            - type: object
+              required:
+                - sourceId
+                - type
+                - name
+                - location
+                - geometry
+              properties:
+                sourceId:
+                  type: string
+                  description: Client's identifier for the new FoI (REQUIRED for CREATE)
+                id:
+                  type: string
+                  nullable: true
+                  description: MUST be null or absent for CREATE operations
+                clientId:
+                  type: string
+                  nullable: true
+                  deprecated: true
+                  description: Deprecated - use sourceId instead
+
+    UpdateFoiData:
+      title: Update FoI Data
+      type: object
+      required:
+        - foi
+      description: Data for updating an existing FoI (UPDATE)
+      properties:
+        foi:
+          allOf:
+            - $ref: '#/components/schemas/DigitaleDelta.Foi'
+            - type: object
+              required:
+                - id
+                - type
+                - name
+                - location
+                - geometry
+              properties:
+                id:
+                  type: string
+                  description: Server identifier for the FoI (REQUIRED for UPDATE/DEPRECATE)
+                sourceId:
+                  type: string
+                  nullable: true
+                  description: MUST be null or absent for UPDATE operations
+                clientId:
+                  type: string
+                  nullable: true
+                  deprecated: true
+                  description: Deprecated - not used for UPDATE
+
+    UpsertFoiData:
+      title: Upsert FoI Data
+      type: object
+      description: Data for upserting a FoI (CREATE or UPDATE)
+      oneOf:
+        - $ref: '#/components/schemas/CreateFoiData'
+        - $ref: '#/components/schemas/UpdateFoiData'
+      discriminator:
+        propertyName: foi
+        mapping:
+          sourceId: '#/components/schemas/CreateFoiData'
+          id: '#/components/schemas/UpdateFoiData'
+
+    DeprecateFoiData:
+      title: Deprecate FoI Data
+      type: object
+      required:
+        - id
+        - reason
+      description: Data for deprecating a FoI
+      properties:
+        id:
+          type: string
+          description: Server ID (string) of the FoI to deprecate (MUST be server-generated)
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: The reason for deprecation
+        effectiveDate:
+          type: string
+          format: date-time
+          description: Date when the deprecation takes effect
+
+    CreateParameterData:
+      title: Create Parameter Data
+      type: object
+      required:
+        - parameter
+      description: Data for creating a new parameter (INSERT)
+      properties:
+        parameter:
+          allOf:
+            - $ref: '#/components/schemas/DigitaleDelta.Parameter'
+            - type: object
+              required:
+                - sourceId
+                - name
+                - definition
+              properties:
+                sourceId:
+                  type: string
+                  description: Client's identifier for the new parameter (REQUIRED for CREATE)
+                id:
+                  type: string
+                  nullable: true
+                  description: MUST be null or absent for CREATE operations
+                clientId:
+                  type: string
+                  nullable: true
+                  deprecated: true
+                  description: Deprecated - use sourceId instead
+
+    UpdateParameterData:
+      title: Update Parameter Data
+      type: object
+      required:
+        - parameter
+      description: Data for updating an existing parameter (UPDATE)
+      properties:
+        parameter:
+          allOf:
+            - $ref: '#/components/schemas/DigitaleDelta.Parameter'
+            - type: object
+              required:
+                - id
+                - name
+                - definition
+              properties:
+                id:
+                  type: string
+                  description: Server identifier for the parameter (REQUIRED for UPDATE/DEPRECATE)
+                sourceId:
+                  type: string
+                  nullable: true
+                  description: MUST be null or absent for UPDATE operations
+                clientId:
+                  type: string
+                  nullable: true
+                  deprecated: true
+                  description: Deprecated - not used for UPDATE
+
+    UpsertParameterData:
+      title: Upsert Parameter Data
+      type: object
+      description: Data for upserting a parameter (CREATE or UPDATE)
+      oneOf:
+        - $ref: '#/components/schemas/CreateParameterData'
+        - $ref: '#/components/schemas/UpdateParameterData'
+      discriminator:
+        propertyName: parameter
+        mapping:
+          sourceId: '#/components/schemas/CreateParameterData'
+          id: '#/components/schemas/UpdateParameterData'
+
+    BatchOptions:
+      title: Batch Options
+      type: object
+      description: Optional settings for the batch processing
+      properties:
+        continueOnError:
+          type: boolean
+          default: true
+          description: |-
+            If true, processing continues even if individual operations fail.
+            If false, processing stops at the first error.
+        validateOnly:
+          type: boolean
+          default: false
+          description: |-
+            If true, only validation is performed, no actual changes are made.
+            Useful for testing batch requests.
+        callbackUrl:
+          type: string
+          format: uri
+          maxLength: 2048
+          description: |-
+            Optional URL to which a notification will be sent when the batch
+            processing is complete. The implementation MAY support this feature.
+
+    WriteJobStatus:
+      title: Write Job Status and Results
+      type: object
+      required:
+        - jobId
+        - status
+        - createdAt
+        - totalOperations
+      description: |
+        Status and results of a batch job.
+        
+        **🔴 CRITISCHE REGEL: De client mag NOOIT de server ID dicteren**
+        De server genereert altijd zelf de server ID (als string) en retourneert deze.
+        
+        When status is 'queued' or 'processing': only basic status fields are present.
+        When status is 'completed' or 'failed': operations and errors fields are included.
+        The `operations` array contains both `sourceId` and `id` for traceability.
+      properties:
+        jobId:
+          type: string
+          
+          description: Unique identifier for this job
+        status:
+          type: string
+          enum: [queued, processing, completed, failed]
+          description: Current status of the job
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the job was created
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp when processing started
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp when processing completed
+        totalOperations:
+          type: integer
+          minimum: 0
+          description: Total number of operations in the batch
+        successfulOperations:
+          type: integer
+          minimum: 0
+          nullable: true
+          description: Number of successfully processed operations (only present when status is completed or failed)
+        failedOperations:
+          type: integer
+          minimum: 0
+          nullable: true
+          description: Number of failed operations (only present when status is completed or failed)
+        operations:
+          type: array
+          nullable: true
+          description: Status of individual operations (only present when status is completed or failed)
+          items:
+            $ref: '#/components/schemas/OperationResult'
+        errors:
+          type: array
+          nullable: true
+          description: General errors at batch level (only present when status is completed or failed)
+          items:
+            $ref: '#/components/schemas/BatchError'
+        location:
+          type: string
+          format: uri
+          description: URL to check the status of this job
+
+    OperationResult:
+      title: Operation Result
+      type: object
+      required:
+        - operationIndex
+        - operationId
+        - status
+      description: |
+        Result of an individual operation within a batch.
+        
+        **🔴 CRITISCHE REGEL: De client mag NOOIT de server ID dicteren**
+        De server genereert altijd zelf de server ID (als string) en retourneert deze.
+        
+        For **INSERT** operations (when a new entity is created):
+        - `sourceId`: The original client-provided sourceId (can be any format)
+        - `id`: The **server-generated identifier (string)**
+        - Both IDs are returned so the client can maintain the mapping
+        
+        For **UPDATE/DEPRECATE** operations:
+        - `sourceId`: Will be null (no sourceId in update/deprecate)
+        - `id`: The **server identifier (string)** that was used
+      properties:
+        operationIndex:
+          type: integer
+          minimum: 0
+          description: Index of the operation in the original batch
+        operationId:
+          type: string
+          description: The ID provided in the request, or generated index
+        status:
+          type: string
+          enum: [succeeded, failed, skipped]
+          description: Status of this operation
+        sourceId:
+          type: string
+          nullable: true
+          description: |-
+            The original client sourceId (only for INSERT operations, can be any format).
+            Null for UPDATE/DEPRECATE operations.
+        id:
+          type: string
+          nullable: true
+          description: The server-generated identifier (string) for the entity
+        entityType:
+          type: string
+          enum: [observation, foi, parameter]
+          description: The type of entity that was processed
+        messages:
+          type: array
+          description: Messages related to this operation
+          items:
+            $ref: '#/components/schemas/OperationMessage'
+
+    OperationMessage:
+      title: Operation Message
+      type: object
+      required:
+        - code
+        - message
+      description: Error or warning message for an operation
+      properties:
+        code:
+          type: string
+          description: Error or warning code
+          examples:
+            - "CLIENT_ID_IN_UPDATE"
+            - "ENTITY_NOT_FOUND"
+            - "INVALID_CLIENT_ID"
+            - "DUPLICATE_CLIENT_ID"
+            - "CLIENT_ID_MISMATCH"
+        message:
+          type: string
+          description: Human-readable message
+        severity:
+          type: string
+          enum: [info, warning, error]
+          default: error
+        path:
+          type: string
+          description: JSON pointer to the field with the issue
+        details:
+          type: object
+          additionalProperties: true
+          description: Additional details about the error
+
+    BatchError:
+      title: Batch Error
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Error code
+        message:
+          type: string
+          description: Human-readable error message
+        severity:
+          type: string
+          enum: [warning, error]
+          default: error
+
+    # ========================================================================
+    # DD API V4 Core Schemas with Key Exchange Support
+    # ========================================================================
+
+    DigitaleDelta.Observation:
+      title: Observation
+      type: object
+      description: |
+        Defines an observation. The type of the observation defines how the results are expressed.
+        
+        **🔴 Key Exchange (CRITISCH):**
+        - `id`: For CREATE: Client's own identifier (any format). For UPDATE: **server ID** (from previous response)
+        - `clientId`: Optional, must match `id` if provided. Only for CREATE.
+        - **De client mag NOOIT de server ID dicteren - de server genereert altijd zelf de identifier (string)**
+      required:
+        - id
+        - type
+        - resultTime
+        - phenomenonTime
+        - parameter
+        - modifiedOn
+      properties:
+        id:
+          type: string
+          description: |
+            Unique ID of the observation.
+            - **For CREATE**: Client's own identifier (can be any format)
+            - **For UPDATE/DEPRECATE**: **server ID (string)** (from previous CREATE response)
+        clientId:
+          type: string
+          nullable: true
+          description: |
+            Optional client identifier (can be any format). If provided, MUST match the `id` field.
+            Only used for CREATE operations. **De server genereert altijd zelf de identifier (string)**.
+        resultTime:
+          type: string
+          format: date-time
+        phenomenonTime:
+          $ref: '#/components/schemas/DigitaleDelta.TmPeriod_Closed'
+        validTime:
+          anyOf:
+            - $ref: '#/components/schemas/DigitaleDelta.TmPeriod_OpenEnd'
+            - type: object
+              nullable: true
+        parameter:
+          $ref: '#/components/schemas/DigitaleDelta.ParameterContainer'
+        metadata:
+          anyOf:
+            - $ref: '#/components/schemas/DigitaleDelta.MetadataContainer'
+            - type: object
+              nullable: true
+        foi:
+          anyOf:
+            - $ref: '#/components/schemas/DigitaleDelta.Foi'
+            - type: object
+              nullable: true
+          description: Feature of Interest (reference by server ID)
+        result:
+          anyOf:
+            - $ref: '#/components/schemas/DigitaleDelta.Result'
+            - type: object
+              nullable: true
+        modifiedOn:
+          type: string
+          format: date-time
+
+    DigitaleDelta.TmPeriod_OpenEnd:
+      title: TmPeriod_OpenEnd
+      type: object
+      required:
+        - begin
+      properties:
+        begin:
+          type: string
+          format: date-time
+        end:
+          type: string
+          format: date-time
+          nullable: true
+
+    DigitaleDelta.TmPeriod_Closed:
+      title: TmPeriod_Closed
+      type: object
+      required:
+        - begin
+        - end
+      properties:
+        begin:
+          type: string
+          format: date-time
+        end:
+          type: string
+          format: date-time
+
+    DigitaleDelta.Foi:
+      title: Feature of Interest
+      description: |
+        Feature of Interest as defined in the DD API V4 CSDL.
+        
+        **🔴 Key Exchange (CRITISCH):**
+        - `id`: For CREATE: Client's own identifier (any format). For UPDATE: **server ID** (from previous response)
+        - `clientId`: Optional, must match `id` if provided. Only for CREATE.
+        - **De client mag NOOIT de server ID dicteren - de server genereert altijd zelf de identifier (string)**
+      type: object
+      required:
+        - id
+        - code
+        - description
+      properties:
+        id:
+          type: string
+          description: |
+            Id of the Feature of Interest.
+            - **For CREATE**: Client's own identifier (can be any format)
+            - **For UPDATE/DEPRECATE**: **Server server-controlled string** (from previous CREATE response)
+        clientId:
+          type: string
+          nullable: true
+          description: |
+            Optional client identifier (can be any format). If provided, MUST match the `id` field.
+            Only used for CREATE operations. **De server genereert altijd zelf de identifier (string)**.
+        type:
+          type: string
+          nullable: true
+          description: Type of the Feature of Interest.
+        organisation:
+          type: string
+          nullable: true
+          description: Organisation responsible for the Feature of Interest.
+        code:
+          type: string
+          description: Code of the Feature of Interest.
+        geometry:
+          anyOf:
+            - $ref: '#/components/schemas/Edm.Geometry'
+            - type: object
+              nullable: true
+        description:
+          type: string
+          description: Description of the Feature of Interest.
+        identities:
+          anyOf:
+            - $ref: '#/components/schemas/DigitaleDelta.FoiIdentityContainer'
+            - type: object
+              nullable: true
+        classifications:
+          anyOf:
+            - $ref: '#/components/schemas/DigitaleDelta.FoiClassificationContainer'
+            - type: object
+              nullable: true
+        networks:
+          type: array
+          items:
+            type: string
+          nullable: true
+
+    DigitaleDelta.Parameter:
+      title: Parameter
+      type: object
+      description: |
+        A reference is an entity to which observations can refer.
+        
+        **🔴 Key Exchange (CRITISCH):**
+        - `id`: For CREATE: Client's own identifier (any format). For UPDATE: **server ID** (from previous response)
+        - `clientId`: Optional, must match `id` if provided. Only for CREATE.
+        - **De client mag NOOIT de server ID dicteren - de server genereert altijd zelf de identifier (string)**
+      properties:
+        id:
+          type: string
+          description: |
+            Unique ID of the reference.
+            - **For CREATE**: Client's own identifier (can be any format)
+            - **For UPDATE**: **Server server-controlled string** (from previous CREATE response)
+        clientId:
+          type: string
+          nullable: true
+          description: |
+            Optional client identifier (can be any format). If provided, MUST match the `id` field.
+            Only used for CREATE operations. **De server genereert altijd zelf de identifier (string)**.
+        type:
+          type: string
+          nullable: true
+          description: Type of the reference
+        organisation:
+          type: string
+          nullable: true
+          description: Organisation responsible for the reference
+        code:
+          type: string
+          description: Code of the reference
+        description:
+          type: string
+          description: Short description of the reference
+        details:
+          $ref: "#/components/schemas/DigitaleDelta.ParameterDetailsContainer"
+
+    DigitaleDelta.ParameterContainer:
+      title: ParameterContainer
+      type: object
+      description: Defines the quantifiable references related to the observation
+      additionalProperties: true
+
+    DigitaleDelta.ParameterDetailsContainer:
+      title: ParameterDetailsContainer
+      type: object
+      description: Defines the quantifiable references known to the system
+      additionalProperties: true
+
+    DigitaleDelta.FoiIdentityContainer:
+      title: FoiIdentityContainer
+      type: object
+      description: Defines alternate identities for FoI.
+      additionalProperties: true
+
+    DigitaleDelta.FoiClassificationContainer:
+      title: FoiClassificationContainer
+      type: object
+      description: Defines classifications for FoI.
+      additionalProperties: true
+
+    DigitaleDelta.MetadataContainer:
+      title: MetadataContainer
+      type: object
+      description: Non-quantifiable data
+      additionalProperties: true
+
+    DigitaleDelta.Result:
+      title: Result
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+          description: Unique ID of the result.
+        truth:
+          type: boolean
+          nullable: true
+          description: Truth observation. Can only result in true or false.
+        count:
+          type: integer
+          format: int64
+          nullable: true
+          description: Count observation. No unit specified and the value can only be an integer value.
+        measure:
+          anyOf:
+            - $ref: '#/components/schemas/DigitaleDelta.Measure'
+            - type: object
+              nullable: true
+          description: Result is expressed in a unit and a value.
+        category:
+          anyOf:
+            - $ref: '#/components/schemas/DigitaleDelta.Category'
+            - type: object
+              nullable: true
+          description: Result is expressed as a category.
+        coverageJSON:
+          anyOf:
+            - type: object
+              nullable: true
+          description: Result is expressed as CoverageJSON.
+        retracted:
+          anyOf:
+            - $ref: '#/components/schemas/DigitaleDelta.Retracted'
+            - type: object
+              nullable: true
+
+    DigitaleDelta.Measure:
+      title: Measure
+      type: object
+      required:
+        - uom
+        - value
+      properties:
+        uom:
+          type: string
+          description: Unit of measurement.
+        value:
+          oneOf:
+            - type: number
+              format: double
+            - type: string
+          description: Measured value.
+        namespace:
+          type: string
+          nullable: true
+          description: Namespace of the unit of the measured value.
+        limitSymbol:
+          type: string
+          nullable: true
+          description: Limit symbol of the measured value.
+
+    DigitaleDelta.Category:
+      title: Category
+      type: object
+      required:
+        - nameSpace
+        - code
+      properties:
+        nameSpace:
+          type: string
+          description: Vocabulary namespace.
+        code:
+          type: string
+          description: Term within the vocabulary.
+
+    DigitaleDelta.Retracted:
+      title: Retracted
+      type: object
+      required:
+        - reason
+      properties:
+        reason:
+          type: string
+
+    Edm.Geometry:
+      oneOf:
+        - $ref: '#/components/schemas/Edm.GeometryPoint'
+        - $ref: '#/components/schemas/Edm.GeometryLineString'
+        - $ref: '#/components/schemas/Edm.GeometryPolygon'
+        - $ref: '#/components/schemas/Edm.GeometryMultiPoint'
+        - $ref: '#/components/schemas/Edm.GeometryMultiLineString'
+        - $ref: '#/components/schemas/Edm.GeometryMultiPolygon'
+        - $ref: '#/components/schemas/Edm.GeometryCollection'
+      discriminator:
+        propertyName: type
+
+    Edm.GeometryPoint:
+      type: object
+      required:
+        - type
+        - coordinates
+      properties:
+        type:
+          type: string
+          enum: [Point]
+        coordinates:
+          type: array
+          minItems: 2
+          items:
+            type: number
+            format: double
+
+    Edm.GeometryLineString:
+      type: object
+      required:
+        - type
+        - coordinates
+      properties:
+        type:
+          type: string
+          enum: [LineString]
+        coordinates:
+          type: array
+          minItems: 2
+          items:
+            type: array
+            minItems: 2
+            items:
+              type: number
+              format: double
+
+    Edm.GeometryPolygon:
+      type: object
+      required:
+        - type
+        - coordinates
+      properties:
+        type:
+          type: string
+          enum: [Polygon]
+        coordinates:
+          type: array
+          minItems: 1
+          items:
+            type: array
+            minItems: 4
+            items:
+              type: array
+              minItems: 2
+              items:
+                type: number
+                format: double
+
+    Edm.GeometryMultiPoint:
+      type: object
+      required:
+        - type
+        - coordinates
+      properties:
+        type:
+          type: string
+          enum: [MultiPoint]
+        coordinates:
+          type: array
+          items:
+            type: array
+            minItems: 2
+            items:
+              type: number
+              format: double
+
+    Edm.GeometryMultiLineString:
+      type: object
+      required:
+        - type
+        - coordinates
+      properties:
+        type:
+          type: string
+          enum: [MultiLineString]
+        coordinates:
+          type: array
+          items:
+            type: array
+            minItems: 2
+            items:
+              type: array
+              minItems: 2
+              items:
+                type: number
+                format: double
+
+    Edm.GeometryMultiPolygon:
+      type: object
+      required:
+        - type
+        - coordinates
+      properties:
+        type:
+          type: string
+          enum: [MultiPolygon]
+        coordinates:
+          type: array
+          items:
+            type: array
+            items:
+              type: array
+              minItems: 4
+              items:
+                type: array
+                minItems: 2
+                items:
+                  type: number
+                  format: double
+
+    Edm.GeometryCollection:
+      type: object
+      required:
+        - type
+        - geometries
+      properties:
+        type:
+          type: string
+          enum: [GeometryCollection]
+        geometries:
+          type: array
+          items:
+            $ref: '#/components/schemas/Edm.Geometry'
+
+    Error:
+      title: Error
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Machine-readable error code
+          examples:
+            - "INVALID_REQUEST"
+            - "UNAUTHORIZED"
+            - "FORBIDDEN"
+            - "NOT_FOUND"
+            - "CLIENT_ID_IN_UPDATE"
+            - "INVALID_SERVER_ID"
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+              code:
+                type: string
+        traceId:
+          type: string
+          description: Unique trace identifier for debugging
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: INVALID_REQUEST
+            message: The request body is invalid
+            details:
+              - field: /operations/0/operation
+                message: operation is required
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: UNAUTHORIZED
+            message: Authentication required
+
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: FORBIDDEN
+            message: You do not have permission to perform this operation
+
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: NOT_FOUND
+            message: Job with ID 550e8400-e29b-41d4-a716-446655440000 not found
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: INTERNAL_ERROR
+            message: An unexpected error occurred
+
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication (DD API V4 standard)
+
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Bearer token authentication (JWT) (DD API V4 standard)
+
+    oauth2:
+      type: oauth2
+      description: OAuth2 authentication (DD API V4 standard)
+      flows:
+        clientCredentials:
+          tokenUrl: https://auth.example.com/oauth2/token
+
+    mTLS:
+      type: mutualTLS
+      description: Mutual TLS authentication (DD API V4 standard)
+
+  security:
+    - apiKey: []
+    - bearerAuth: []
+    - oauth2: []
+    - mTLS: []

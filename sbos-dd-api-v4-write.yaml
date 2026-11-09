@@ -1,0 +1,401 @@
+sbosFormat: "SBOS"
+sbosVersion: "1.0"
+serialNumber: "urn:uuid:550e8400-e29b-41d4-a716-446655440001"
+metadata:
+  name: "DD API V4 Write Module"
+  version: "4.0.0"
+  description: "Software Bill of Standards for DD API V4 Write Module specification"
+  timestamp: "2024-01-01T00:00:00Z"
+  tools:
+    - vendor: "Mistral AI"
+      name: "Mistral Vibe"
+      version: "1.0"
+  properties:
+    - name: "type"
+      value: "API Specification"
+    - name: "domain"
+      value: "Water Management / Digital Delta"
+
+# ============================================================================
+# STANDAARDEN HIËRARCHIE
+# ============================================================================
+standaardenHierarchie:
+  root: "DD API V4 Write Module"
+  children:
+    - name: "DD API V4 Core"
+      description: "Basis specificatie"
+      children:
+        - name: "Datamodellen"
+          description: "Observation, FoI, Parameter"
+        - name: "Semantische property bags"
+          description: "Flexibele property structuren"
+        - name: "Vocabularia"
+          description: "Aquo, PDOK, etc."
+    - name: "OpenAPI 3.1"
+      description: "API specificatie formaat"
+    - name: "HTTP/1.1"
+      description: "Transport protocol"
+      children:
+        - name: "HTTPS"
+          description: "Beveiligde verbinding"
+    - name: "JSON"
+      description: "Data formaat"
+      children:
+        - name: "GeoJSON"
+          description: "Geometrie formaat"
+    - name: "ISO 8601"
+      description: "Datum/tijd formaat"
+
+# ============================================================================
+# TECHNISCHE STANDAARDEN
+# ============================================================================
+technischeStandaarden:
+  specificatieFormaten:
+    - name: "OpenAPI Specification"
+      versie: "3.1.0"
+      organisatie: "OpenAPI Initiative"
+      url: "https://spec.openapis.org/oas/v3.1.0"
+      rol: "API definitie formaat"
+      conformiteit: "Volledig"
+      opmerkingen: "Gebruikt voor complete API specificatie in oas3.1-write.yaml"
+      uitbreidingen:
+        - "Asynchrone verwerking via polling (geen AsyncAPI)"
+        - "Per-entity endpoints met job tracking"
+
+  dataFormaten:
+    - name: "JSON"
+      versie: "ECMAScript 262 (5e editie)"
+      organisatie: "IETF"
+      url: "https://datatracker.ietf.org/doc/html/rfc8259"
+      standardId: "RFC 8259"
+      rol: "Primair data formaat"
+      mimeType: "application/json"
+      encoding: "UTF-8"
+      gebruik:
+        - "Alle request bodies"
+        - "Alle response bodies"
+
+    - name: "GeoJSON"
+      versie: "1.0"
+      organisatie: "IETF"
+      url: "https://datatracker.ietf.org/doc/html/rfc7946"
+      standardId: "RFC 7946"
+      rol: "Geometrie representatie"
+      mimeType: "application/geo+json"
+      gebruik:
+        - "FoI (Feature of Interest) geometrie velden"
+      coordinatenSysteem:
+        - "WGS 84 (EPSG:4326)"
+        - "ETRS89 (EPSG:4258)"
+      geometryTypes:
+        - "Point"
+        - "LineString"
+        - "Polygon"
+        - "MultiPoint"
+        - "MultiLineString"
+        - "MultiPolygon"
+        - "GeometryCollection"
+
+    - name: "ISO 8601"
+      versie: "2004"
+      organisatie: "ISO"
+      url: "https://www.iso.org/standard/40874.html"
+      standardId: "ISO 8601:2004"
+      rol: "Datum en tijd representatie"
+      format: "yyyy-MM-dd'T'HH:mm:ss.SSSX"
+      timezone: "UTC (Z suffix)"
+      voorbeelden:
+        - "2024-01-15T10:00:00Z"
+        - "2024-01-15T10:00:00.123Z"
+      gebruik:
+        - "resultTime"
+        - "phenomenonTime"
+        - "modifiedOn"
+        - "createdAt"
+        - "startedAt"
+        - "completedAt"
+
+  protocolStandaarden:
+    - name: "HTTP/1.1"
+      organisatie: "IETF"
+      url: "https://datatracker.ietf.org/doc/html/rfc9112"
+      standardId: "RFC 9112"
+      rol: "Transport protocol"
+      methoden:
+        - "POST"
+        - "GET"
+      statusCodes:
+        - "202 Accepted"
+        - "200 OK"
+        - "400 Bad Request"
+        - "401 Unauthorized"
+        - "403 Forbidden"
+        - "404 Not Found"
+        - "413 Payload Too Large"
+        - "500 Internal Server Error"
+
+    - name: "HTTPS"
+      organisatie: "IETF"
+      url: "https://datatracker.ietf.org/doc/html/rfc2818"
+      standardId: "RFC 2818"
+      rol: "Beveiligde communicatie"
+      tlsVersies:
+        - "TLS 1.2 (minimaal)"
+        - "TLS 1.3 (aanbevolen)"
+      vereist: true
+      opmerkingen: "Verplicht voor alle productie implementaties"
+
+# ============================================================================
+# DD API V4 SPECIFIEKE STANDAARDEN
+# ============================================================================
+ddApiV4Standaarden:
+  coreSpecificatie:
+    name: "DD API V4 Core"
+    versie: "4.0"
+    organisatie: "Digitale Delta"
+    url: "https://digitaledeltaorg.github.io/DD-API-V4-ReSpec/"
+    relatie: "extends"
+    gedeeldeComponenten:
+      - name: "Datamodellen"
+        componenten:
+          - "Observation"
+          - "Feature of Interest (FoI)"
+          - "Parameter"
+      - name: "Semantische property bags"
+        description: "Flexibele structuur voor additionele properties"
+      - name: "Vocabularia"
+        description: "Gedeelde vocabulaire referenties"
+      - name: "Tijdsformaten"
+        description: "ISO 8601 conform"
+
+  keyExchangeMechanisme:
+    name: "Key Exchange"
+    beschrijving: "Server-controlled identifier beheer"
+    principes:
+      - "Server genereert altijd zelf identifiers (als string)"
+      - "Client mag NOOIT server ID dicteren"
+    regels:
+      insert:
+        clientVeld: "sourceId"
+        serverVeld: "id"
+        vereist: "sourceId"
+        verboden: "id"
+        response: "beide velden (sourceId + id)"
+      update:
+        clientVeld: "id"
+        serverVeld: "id"
+        vereist: "id (server ID)"
+        verboden: "sourceId"
+        response: "alleen id"
+      deprecate:
+        clientVeld: "id"
+        serverVeld: "id"
+        vereist: "id (server ID)"
+        verboden: "sourceId"
+        response: "alleen id"
+
+# ============================================================================
+# SEMANTISCHE STANDAARDEN & VOCABULARIA
+# ============================================================================
+semantischeStandaarden:
+  vocabularia:
+    - name: "Aquo"
+      namespace: "http://definities.pdok.nl/def/imkl/1.0/id/waarnemingssoort/"
+      organisatie: "PDOK / I&M"
+      url: "https://definities.pdok.nl"
+      rol: "Waarnemingssoort definities"
+      gebruik: "Parameter waarnemingssoort velden"
+      voorbeelden:
+        - "WATHTE"  # Waterhoogte
+        - "TEMP"    # Temperatuur
+        - "CHL"     # Chlorofyl
+
+    - name: "PDOK Dataset Definities"
+      namespace: "http://definities.pdok.nl/def/cbsgb/1.0/id/datasetdefinitie/"
+      organisatie: "PDOK"
+      url: "https://definities.pdok.nl"
+      rol: "Dataset en feature type definities"
+      gebruik: "FoI type velden"
+      voorbeelden:
+        - "Top10NL"
+        - "BGT"
+        - "AHN"
+
+    - name: "OM&S"
+      organisatie: "Digitale Delta"
+      rol: "Identifier standaard"
+      principes:
+        - "Server genereert altijd zelf identifiers"
+        - "Identifiers zijn altijd strings"
+
+# ============================================================================
+# BEVEILIGINGSSTANDAARDEN
+# ============================================================================
+beveiligingsStandaarden:
+  authenticatie:
+    - name: "API Key"
+      organisatie: "Proprietary (wijdverspreid)"
+      header: "X-API-Key"
+      rol: "Simpele API authenticatie"
+      vereist: true
+      opmerkingen: "MOET ondersteund worden"
+
+    - name: "Bearer Token"
+      organisatie: "IETF"
+      url: "https://datatracker.ietf.org/doc/html/rfc6750"
+      standardId: "RFC 6750"
+      header: "Authorization: Bearer <token>"
+      rol: "Token-based authenticatie"
+      flow: "Client Credentials Flow"
+      related:
+        - name: "OAuth2"
+          standardId: "RFC 6749"
+          url: "https://datatracker.ietf.org/doc/html/rfc6749"
+
+    - name: "mTLS"
+      organisatie: "IETF"
+      url: "https://datatracker.ietf.org/doc/html/rfc8446"
+      standardId: "RFC 8446 (TLS 1.3), RFC 5246 (TLS 1.2)"
+      rol: "Certificate-based authenticatie"
+      beschrijving: "Client en server authenticeren elkaar met certificaten"
+
+  autorisatie:
+    model: "Server-specifiek"
+    principes:
+      - "Client MOET eigenaar zijn van entiteit voor UPDATE/DEPRECATE"
+      - "Eigenaar wordt bepaald via sourceId mapping"
+    opmerkingen: "Niet gespecificeerd in standaard, implementatie-specifiek"
+
+# ============================================================================
+# BATCH VERWERKINGSSTANDAARDEN
+# ============================================================================
+batchVerwerking:
+  jobTracking:
+    endpointStructuur: "/v4/write/{entity}/{jobId}"
+    statusWaarden:
+      - "queued"
+      - "processing"
+      - "completed"
+      - "failed"
+    variableResponse: true
+    description: "Basisinformatie tijdens verwerking, compleet met resultaten na voltooiing"
+
+  asynchroneVerwerking:
+    pattern: "Polling"
+    aanbevolenStrategie: "Exponentiële backoff"
+    backoffIntervals:
+      - "500ms"
+      - "1s"
+      - "2s"
+      - "5s"
+      - "10s (maximum)"
+    timeout: "Server-specifiek"
+
+  callbackNotificaties:
+    mechanisme: "HTTP POST"
+    endpoint: "callbackUrl"
+    format: "JSON"
+    body: "Zelfde als GET /{entity}/{jobId} response"
+    vereist: true
+    foutafhandeling: "Mislukte callback = job fout"
+
+  operatieTypes:
+    - name: "insert"
+      description: "Nieuwe entiteit toevoegen (CREATE)"
+      vereist: "sourceId"
+      verboden: "id"
+    - name: "update"
+      description: "Bestaande entiteit bijwerken (UPDATE)"
+      vereist: "id (server ID)"
+      verboden: "sourceId"
+    - name: "deprecate"
+      description: "Entiteit als vervallen markeren (DEPRECATE)"
+      vereist: "id (server ID)"
+      verboden: "sourceId"
+    - name: "delete"
+      description: "Niet ondersteund"
+      opmerkingen: "Alleen deprecate is toegestaan"
+
+  batchOptions:
+    - name: "continueOnError"
+      type: "boolean"
+      default: true
+      description: "Doorgaan bij fouten in batch"
+    - name: "validateOnly"
+      type: "boolean"
+      default: false
+      description: "Alleen validatie, geen uitvoering"
+    - name: "callbackUrl"
+      type: "string (uri)"
+      maxLength: 2048
+      description: "Verplichte notificatie URL"
+      vereist: true
+
+  batchSize:
+    variabel: true
+    header: "X-Max-Batch-Size"
+    description: "Server-specifieke maximum batch grootte"
+    responseCode: "413 Payload Too Large"
+
+# ============================================================================
+# CONFORMITEITSEISEN
+# ============================================================================
+conformiteit:
+  moet:
+    - "OpenAPI 3.1 specificatie formaat gebruiken"
+    - "DD API V4 Core datamodellen gebruiken"
+    - "Server-controlled identifiers (string) genereren"
+    - "Key Exchange mechanisme implementeren"
+    - "Asynchrone verwerking ondersteunen"
+    - "callbackUrl ondersteunen"
+    - "X-Max-Batch-Size header in 413 responses"
+    - "Per-entity endpoints implementeren"
+    - "Job tracking via status endpoints"
+
+  mag:
+    - "Additionele endpoints implementeren"
+    - "Additionele authenticatiemethoden ondersteunen"
+    - "Rate limiting implementeren"
+
+# ============================================================================
+# EXTERNE REFERENTIES
+# ============================================================================
+externeReferenties:
+  specificaties:
+    - name: "OpenAPI Specification 3.1"
+      organisatie: "OpenAPI Initiative"
+      url: "https://spec.openapis.org/oas/v3.1.0"
+    - name: "DD API V4 Core"
+      organisatie: "Digitale Delta"
+      url: "https://digitaledeltaorg.github.io/DD-API-V4-ReSpec/"
+
+  rfc:
+    - name: "RFC 8259 (JSON)"
+      url: "https://datatracker.ietf.org/doc/html/rfc8259"
+    - name: "RFC 7946 (GeoJSON)"
+      url: "https://datatracker.ietf.org/doc/html/rfc7946"
+    - name: "RFC 9112 (HTTP/1.1)"
+      url: "https://datatracker.ietf.org/doc/html/rfc9112"
+    - name: "RFC 2818 (HTTPS)"
+      url: "https://datatracker.ietf.org/doc/html/rfc2818"
+    - name: "RFC 6749 (OAuth2)"
+      url: "https://datatracker.ietf.org/doc/html/rfc6749"
+    - name: "RFC 6750 (Bearer Token)"
+      url: "https://datatracker.ietf.org/doc/html/rfc6750"
+    - name: "RFC 8446 (TLS 1.3)"
+      url: "https://datatracker.ietf.org/doc/html/rfc8446"
+    - name: "RFC 5246 (TLS 1.2)"
+      url: "https://datatracker.ietf.org/doc/html/rfc5246"
+
+  iso:
+    - name: "ISO 8601:2004"
+      url: "https://www.iso.org/standard/40874.html"
+
+  organisaties:
+    - name: "PDOK"
+      url: "https://www.pdok.nl"
+    - name: "PDOK Definitions"
+      url: "https://definities.pdok.nl"
+    - name: "Digitale Delta"
+      url: "https://digitaledelta.org"
+
