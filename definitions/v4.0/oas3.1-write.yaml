@@ -549,9 +549,7 @@ components:
           description: The type of operation to perform (insert, update or retract)
         clientId:
           type: string
-          description: |
-            Client identifier for the entity (only for INSERT operations).
-            Must match the clientId in the data section.
+          description: Client identifier for the entity (REQUIRED for INSERT operations only)
         data:
           type: object
           description: The data for this operation
@@ -589,9 +587,7 @@ components:
           description: The type of operation to perform (insert or update)
         clientId:
           type: string
-          description: |
-            Client identifier for the entity (only for INSERT operations).
-            Must match the clientId in the data section.
+          description: Client identifier for the entity (REQUIRED for INSERT operations only)
         data:
           type: object
           description: The data for this operation
@@ -629,9 +625,7 @@ components:
           description: The type of operation to perform (insert or update for parameters)
         clientId:
           type: string
-          description: |
-            Client identifier for the entity (only for INSERT operations).
-            Must match the clientId in the data section.
+          description: Client identifier for the entity (REQUIRED for INSERT operations only)
         data:
           type: object
           description: The data for this operation
@@ -652,18 +646,14 @@ components:
       title: Create Observation Data
       type: object
       required:
-        - clientId
         - observation
       description: |
         Data for creating a new observation (INSERT)
         
         **Key Exchange:**
-        - `clientId`: REQUIRED - Client's identifier for the new observation (any format)
         - `observation.id`: MUST be empty string "" for CREATE operations
+        - clientId is at operation level, not in data
       properties:
-        clientId:
-          type: string
-          description: Client's identifier for the new observation (REQUIRED for CREATE, any format)
         observation:
           allOf:
             - $ref: '#/components/schemas/DigitaleDelta.Observation'
@@ -703,11 +693,6 @@ components:
                 id:
                   type: string
                   description: Server identifier for the observation (REQUIRED for UPDATE/RETRACT, from previous CREATE response)
-                clientId:
-                  type: string
-                  nullable: true
-                  readOnly: true
-                  description: MUST be null or absent for UPDATE operations
 
     RetractObservationData:
       title: Retract Observation Data
@@ -734,18 +719,14 @@ components:
       title: Create FoI Data
       type: object
       required:
-        - clientId
         - foi
       description: |
         Data for creating a new FoI (INSERT)
         
         **Key Exchange:**
-        - `clientId`: REQUIRED - Client's identifier for the new FoI (any format)
         - `foi.id`: MUST be empty string "" for CREATE operations
+        - clientId is at operation level, not in data
       properties:
-        clientId:
-          type: string
-          description: Client's identifier for the new FoI (REQUIRED for CREATE, any format)
         foi:
           allOf:
             - $ref: '#/components/schemas/DigitaleDelta.Foi'
@@ -783,28 +764,19 @@ components:
                 id:
                   type: string
                   description: Server identifier for the FoI (REQUIRED for UPDATE, from previous CREATE response)
-                clientId:
-                  type: string
-                  nullable: true
-                  readOnly: true
-                  description: MUST be null or absent for UPDATE operations
 
     CreateParameterData:
       title: Create Parameter Data
       type: object
       required:
-        - clientId
         - parameter
       description: |
         Data for creating a new parameter (INSERT)
         
         **Key Exchange:**
-        - `clientId`: REQUIRED - Client's identifier for the new parameter (any format)
         - `parameter.id`: MUST be empty string "" for CREATE operations
+        - clientId is at operation level, not in data
       properties:
-        clientId:
-          type: string
-          description: Client's identifier for the new parameter (REQUIRED for CREATE, any format)
         parameter:
           allOf:
             - $ref: '#/components/schemas/DigitaleDelta.Parameter'
@@ -838,11 +810,6 @@ components:
                 id:
                   type: string
                   description: Server identifier for the parameter (REQUIRED for UPDATE, from previous CREATE response)
-                clientId:
-                  type: string
-                  nullable: true
-                  readOnly: true
-                  description: MUST be null or absent for UPDATE operations
 
     BatchOptions:
       title: Batch Options
@@ -885,7 +852,7 @@ components:
         
         When status is 'queued' or 'processing': only basic status fields are present.
         When status is 'completed' or 'failed': operations and errors fields are included.
-        The `operations` array contains both `clientId` and `id` for traceability.
+        The `operations` array contains action, clientId (for inserts) and the complete entity data.
       properties:
         jobId:
           type: string
@@ -946,6 +913,7 @@ components:
       required:
         - operationIndex
         - operationId
+        - action
         - status
       description: |
         Result of an individual operation within a batch.
@@ -953,14 +921,11 @@ components:
         **De client mag NOOIT de server ID dicteren**
         De server genereert altijd zelf de server ID (als string) en retourneert deze.
         
-        For **INSERT** operations (when a new entity is created):
-        - `clientId`: The original client-provided clientId (can be any format)
-        - `id`: The **server-generated identifier (string)**
-        - Both IDs are returned so the client can maintain the mapping
-        
-        For **UPDATE/RETRACT** operations:
-        - `clientId`: Will be null (no clientId in update/retract)
-        - `id`: The **server identifier (string)** that was used
+        Contains:
+        - `action`: The requested action (insert/update/retract)
+        - `clientId`: The client-provided clientId (only for INSERT operations)
+        - `data`: The complete entity data (with server-generated IDs for INSERT)
+        - `status`: Status of the operation
       properties:
         operationIndex:
           type: integer
@@ -969,24 +934,26 @@ components:
         operationId:
           type: string
           description: The ID provided in the request, or generated index
+        action:
+          type: string
+          enum: [insert, update, retract]
+          description: The action that was requested
+        clientId:
+          type: string
+          nullable: true
+          description: The client-provided identifier (only for INSERT operations, null for UPDATE/RETRACT)
         status:
           type: string
           enum: [succeeded, failed, skipped]
           description: Status of this operation
-        clientId:
-          type: string
+        data:
+          type: object
           nullable: true
-          description: |-
-            The original client clientId (only for INSERT operations, can be any format).
-            Null for UPDATE/RETRACT operations.
-        id:
-          type: string
-          nullable: true
-          description: The server-generated identifier (string) for the entity
-        entityType:
-          type: string
-          enum: [observation, foi, parameter]
-          description: The type of entity that was processed
+          description: The complete entity data (with server-generated IDs)
+          oneOf:
+            - $ref: '#/components/schemas/DigitaleDelta.Observation'
+            - $ref: '#/components/schemas/DigitaleDelta.Foi'
+            - $ref: '#/components/schemas/DigitaleDelta.Parameter'
         messages:
           type: array
           description: Messages related to this operation
