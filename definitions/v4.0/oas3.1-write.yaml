@@ -153,7 +153,7 @@ paths:
                       data:
                         id: "550e8400-e29b-41d4-a716-446655440001"
                         reason: "Foutieve meting"
-                        effectiveDate: "2024-01-15T10:00:00Z"
+                        modifiedOn: "2024-01-15T10:00:00Z"
       responses:
         '202':
           description: Batch accepted for processing
