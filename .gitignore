@@ -55,3 +55,11 @@ coverage/
 *.swo
 *~
 /definitions/v3.0/
+vcs.xml
+workspace.xml
+encodings.xml
+Folder.DotSettings.user
+misc.xml
+material_theme_project_new.xml
+indexLayout.xml
+
