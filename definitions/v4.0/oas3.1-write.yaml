@@ -1661,12 +1661,6 @@ components:
             message: An unexpected error occurred
 
   securitySchemes:
-    apiKey:
-      type: apiKey
-      in: header
-      name: X-API-Key
-      description: API key for authentication (DD API V4 standard)
-
     bearerAuth:
       type: http
       scheme: bearer
@@ -1685,7 +1679,6 @@ components:
       description: Mutual TLS authentication (DD API V4 standard)
 
   security:
-    - apiKey: []
     - bearerAuth: []
     - oauth2: []
     - mTLS: []

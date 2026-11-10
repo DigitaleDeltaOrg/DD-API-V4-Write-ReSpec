@@ -68,14 +68,9 @@ Hoewel de datamodellen gelijk blijven aan DD API V4, wordt de OData-wrapper verv
 
 De Write module ondersteunt:
 
-- ✅ **Insert** van Observations via `POST /v4/write/observation`
-- ✅ **Update** van Observations via `POST /v4/write/observation`
-- ✅ **Insert** van Features of Interest via `POST /v4/write/foi`
-- ✅ **Update** van Features of Interest via `POST /v4/write/foi`
-- ✅ **Insert** van Parameters via `POST /v4/write/parameter`
-- ✅ **Update** van Parameters via `POST /v4/write/parameter`
-- ✅ **Deprecate/Retract** van Observations via `POST /v4/write/observation`
-- ✅ **Deprecate/Retract** van Features of Interest via `POST /v4/write/foi`
+- ✅ **Insert**, **update**, **retract** van Observations via `POST /v4/write/observation`
+- ✅ **Insert**, **update**, **retract** van Features of Interest via `POST /v4/write/foi`
+- ✅ **Insert**, **update**, **retract** van Parameters via `POST /v4/write/parameter`
 - ✅ **Job status tracking** via per-entity endpoints (GET /write/{entity}/{jobId})
 - ✅ **Variable response**: GET /write/{entity}/{jobId} retourneert basisinformatie tijdens verwerking, en basis + resultaten wanneer klaar
 - ✅ **Server-controlled identifiers**: Server genereert altijd zelf identifiers (als string)

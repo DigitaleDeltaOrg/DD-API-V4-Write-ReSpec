@@ -418,10 +418,11 @@ Clients MOETEN de status van jobs opvragen via polling op het **specifieke entit
 Alle Write endpoints vereisen authenticatie volgens **de standaard authenticatie methoden die DD API V4 specificeert**.
 
 De implementatie MOET minimaal één van de volgende standaard methoden ondersteunen:
-- API Key (via `X-API-Key` header)
 - Bearer Token (via `Authorization: Bearer <token>` header)
 - OAuth2 (client credentials flow)
 - mTLS (Mutual TLS certificaten)
+
+X-API-KEY is **NIET** toegestaan voor deze bewerkingen.
 
 > **Noot**: De exacte authenticatiemethode(n) en configuratie zijn implementatie-specifiek, zolang deze voldoen aan de DD API V4 standaard.
 

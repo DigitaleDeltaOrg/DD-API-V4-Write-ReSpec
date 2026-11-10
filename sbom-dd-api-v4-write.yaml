@@ -21,7 +21,7 @@ metadata:
     purl: "pkg:github/DigitaleDeltaOrg/DD-API-V4-Write-ReSpec@4.0.0"
     externalReferences:
       - type: "website"
-        url: "https://digitaledeltaorg.github.io/DD-API-V4-ReSpec/20-00-write-module"
+        url: "https://digitaledeltaorg.github.io/DD-API-V4-ReSpec/index.html"
         comment: "Official documentation"
       - type: "vcs"
         url: "https://github.com/DigitaleDeltaOrg/DD-API-V4-Write-ReSpec"
@@ -168,16 +168,7 @@ components:
     mimeType: "text/html"
     externalReferences:
       - type: "build-system"
-        url: "./definitions/index.html"
-
-  - type: "file"
-    name: "index.html (v4.0)"
-    version: "4.0"
-    description: "V4.0 index HTML"
-    mimeType: "text/html"
-    externalReferences:
-      - type: "build-system"
-        url: "./definitions/v4.0/index.html"
+        url: "./index.html"
 
 # Afhankelijkheden (Externe Componenten)
 dependencies:
@@ -263,24 +254,13 @@ dependencies:
   - ref: "Aquo Vocabulary"
     properties:
       - name: "namespace"
-        value: "http://definities.pdok.nl/def/imkl/1.0/id/waarnemingssoort/"
+        value: "https://definities.pdok.nl/def/imkl/1.0/id/waarnemingssoort/"
       - name: "url"
-        value: "https://definities.pdok.nl"
+        value: "https://aquo.nl"
       - name: "role"
         value: "Observation parameter vocabulary"
       - name: "maintainer"
-        value: "PDOK"
-
-  - ref: "PDOK Definitions"
-    properties:
-      - name: "namespace"
-        value: "http://definities.pdok.nl/def/cbsgb/1.0/id/datasetdefinitie/"
-      - name: "url"
-        value: "https://definities.pdok.nl"
-      - name: "role"
-        value: "Feature type vocabulary"
-      - name: "maintainer"
-        value: "PDOK"
+        value: "Informatiehuis Water"
 
   # Security
   - ref: "OAuth2"
@@ -321,11 +301,8 @@ externalReferences:
     url: "https://digitaledeltaorg.github.io/DD-API-V4-ReSpec/"
     comment: "DD API V4 Core"
   - type: "website"
-    url: "https://www.pdok.nl"
-    comment: "PDOK"
-  - type: "website"
-    url: "https://definities.pdok.nl"
-    comment: "PDOK Definitions"
+    url: "https://digitaledeltaorg.github.io/DD-API-V4-ReSpec/index.html"
+    comment: "Hoofdpagina"
 
 properties:
   - name: "sbomType"

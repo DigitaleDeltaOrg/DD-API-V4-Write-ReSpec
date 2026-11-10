@@ -45,7 +45,6 @@
 | **Naam**   | **Type** | **Beschrijving** | **Locatie**                    |
 |------------|----------|------------------|--------------------------------|
 | index.html | HTML     | Hoofdindex       | `/definitions/index.html`      |
-| index.html | HTML     | V4.0 index       | `/definitions/v4.0/index.html` |
 
 ---
 
@@ -79,9 +78,10 @@
 
 ### 1. Semantische Vocabularia
 
-| **Vocabulaire** | **Namespace**                                                  | **Beschrijving**        | **Gebruik**          |
-|-----------------|----------------------------------------------------------------|-------------------------|----------------------|
-| **OM&S**        | -                                                              | Objecten en Services    | ID formaat (string)  |
+| **Vocabulaire** | **Namespace** | **Beschrijving**                    | **Gebruik**         |
+|-----------------|---------------|-------------------------------------|---------------------|
+| **OM&S**        | -             | Objecten en Services                | ID formaat (string) |
+| **Aquo**        | -             | Domeintabellen/waarden en begrippen | ID formaat (string) |
 
 ### 2. Eigene Namespaces
 
@@ -97,7 +97,6 @@
 
 | **Mechanisme** | **Standaard** | **Beschrijving**                |
 |----------------|---------------|---------------------------------|
-| API Key        | -             | `X-API-Key` header              |
 | Bearer Token   | RFC 6750      | `Authorization: Bearer <token>` |
 | OAuth2         | RFC 6749      | Client Credentials Flow         |
 | mTLS           | RFC 5246      | Mutual TLS certificaten         |
@@ -131,11 +130,11 @@ sbom:
 
 ## 📞 Contact & Ondersteuning
 
-| **Eigenschap**   | **Waarde**                                                                                     |
-|------------------|------------------------------------------------------------------------------------------------|
-| **Organisatie**  | Digitale Delta                                                                                 |
-| **Repository**   | [DD-API-V4-Write-ReSpec](https://github.com/DigitaleDeltaOrg/DD-API-V4-Write-ReSpec)           |
-| **Documentatie** | [DD API V4 Write Docs](https://digitaledeltaorg.github.io/DD-API-V4-ReSpec/20-00-write-module) |
+| **Eigenschap**   | **Waarde**                                                                           |
+|------------------|--------------------------------------------------------------------------------------|
+| **Organisatie**  | Digitale Delta                                                                       |
+| **Repository**   | [DD-API-V4-Write-ReSpec](https://github.com/DigitaleDeltaOrg/DD-API-V4-Write-ReSpec) |
+| **Documentatie** | [DD-API-V4-Write-ReSpec](https://github.com/DigitaleDeltaOrg/DD-API-V4-Write-ReSpec) |
 
 ---
 

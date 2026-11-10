@@ -103,7 +103,7 @@ DD API V4 Write Module (Deze specificatie)
 - **Gedeelde Componenten**:
   - Datamodellen: Observation, Feature of Interest (FoI), Parameter
   - Semantische property bags
-  - Vocabularia (Aquo, PDOK)
+  - Vocabularia (Aquo)
   - Tijdsformaten (ISO 8601)
 - **Relatie**: Write Module is een **uitbreiding** op DD API V4 Core
 
@@ -123,33 +123,19 @@ DD API V4 Write Module (Deze specificatie)
 ### 1. **Aquo (Aquo Vocabulaire)**
 - **Namespace**: `http://definities.pdok.nl/def/imkl/1.0/id/waarnemingssoort/`
 - **Rol**: Waarnemingssoort definities
-- **Gebruik**: Parameter `waarnemingssoort` velden
-- **Voorbeelden**: WATHTE (waterhoogte), TEMP (temperatuur)
-- **Onderhoud**: PDOK / I&M
+- **Gebruik**: Parameter en Metadata velden
+- **Voorbeelden**: WATHTE (waterhoogte), T (temperatuur)
+- **Onderhoud**: Informatiehuis Water
 
-### 2. **PDOK (Publieke Dienstverlening op de Kaart)**
-- **Namespace**: `http://definities.pdok.nl/def/cbsgb/1.0/id/datasetdefinitie/`
-- **Rol**: Dataset en feature type definities
-- **Gebruik**: FoI `type` velden
-- **Voorbeelden**: Top10NL, BGT, AHN
-- **Onderhoud**: PDOK
-
-### 3. **OM&S (Objecten en Services)**
-- **Rol**: Identificator standaard
+### 3. **OM&S (Observations, Measurements & Samples)**
+- **Rol**: Basis voor observaties
 - **Gebruik**: ID formaat (string) voor alle entiteiten
 - **Principe**: Server genereert altijd zelf identifiers (als string)
-
 ---
 
 ## 🔒 Beveiligingsstandaarden
 
 ### 1. **Authenticatie Mechanismen**
-
-#### **API Key**
-- **Standaard**: Proprietary (wijdverspreid)
-- **Header**: `X-API-Key`
-- **Rol**: Simpele API authenticatie
-- **Vereist**: MOET ondersteund worden
 
 #### **Bearer Token (OAuth2)**
 - **Standaard**: RFC 6750
@@ -164,8 +150,8 @@ DD API V4 Write Module (Deze specificatie)
 
 ### 2. **Autorisatie**
 - **Model**: Server-specifiek (niet gespecificeerd in standaard)
-- **Principe**: Client MOET eigenaar zijn van de entiteit voor UPDATE/DEPRECATE
-- **Eigenaar**: Bepaald via `sourceId` mapping
+- **Principe**: Client bekend zijn met de entiteit voor UPDATE/DEPRECATE
+- **Eigenaar**: Bepaald toegestane actie via authenticatie 
 
 ---
 
@@ -242,8 +228,7 @@ DD API V4 Write Module (Deze specificatie)
 | HTTPS         | IETF               | [RFC 2818](https://datatracker.ietf.org/doc/html/rfc2818)            |
 | OAuth2        | IETF               | [RFC 6749](https://datatracker.ietf.org/doc/html/rfc6749)            |
 | Bearer Token  | IETF               | [RFC 6750](https://datatracker.ietf.org/doc/html/rfc6750)            |
-| Aquo          | PDOK               | [PDOK Aquo](https://definities.pdok.nl)                              |
-| PDOK          | PDOK               | [PDOK](https://www.pdok.nl)                                          |
+| Aquo          | PDOK               | [Aquo](https://aquo.nl)                              |
 | DD API V4     | Digitale Delta     | [DD API V4](https://digitaledeltaorg.github.io/DD-API-V4-ReSpec/)    |
 
 ---
