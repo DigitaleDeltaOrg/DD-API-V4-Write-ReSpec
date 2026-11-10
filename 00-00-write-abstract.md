@@ -28,8 +28,8 @@ Digitale Delta API V4 Write is een uitbreiding op de DD API V4 specificatie en b
    - Bij **CREATE**: Client stuurt data met eigen ID (`clientId`)
      - De server genereert **altijd zelf** een identifier (als string)
      - Response bevat zowel `clientId` als `id` (beide strings)
-   - Bij **UPDATE/DEPRECATE**: Client MOET de `id` (string), dus de id die de server terug heeft gegeven, gebruiken
-     - Gebruik van `clientId` in update/deprecate resulteert in fout `CLIENT_ID_IN_UPDATE`
+   - Bij **UPDATE/RETRACT**: Client MOET de `id` (string), dus de id die de server terug heeft gegeven, gebruiken
+     - Gebruik van `clientId` in update/retract resulteert in fout `CLIENT_ID_IN_UPDATE`
    - **Reden**: Voorkomt key-conflicten tussen verschillende aanbieders en staat clients toe om elk gewenst id-formaat te gebruiken
 
 7. **Variable response**: Het `GET /{entity}/{jobId}` endpoint retourneert **alleen basisinformatie** tijdens verwerking (status = `queued` of `processing`), en **basis + gedetailleerde resultaten** wanneer de job voltooid is (status = `completed` of `failed`).
@@ -38,7 +38,7 @@ Digitale Delta API V4 Write is een uitbreiding op de DD API V4 specificatie en b
 
 De Write module maakt het mogelijk om:
 - **Insert en update**: Observaties, meetobjecten (FoI) en parameters toe te voegen of bij te werken via entiteit-specifieke endpoints
-- **Deprecaten/Vervallen**: Observaties en meetobjecten als vervallen te markeren
+- **Retract/Terugtrekken**: Observaties en meetobjecten als vervallen te markeren
 - **Batch verwerking**: Meerdere operaties voor één entiteitstype in één request te versturen
 - **Asynchrone afhandeling**: Grote batches asynchroon te verwerken met per-entity status-tracking
 
@@ -48,7 +48,7 @@ De Write module:
 
 - Gebruikt dezelfde datamodellen als DD API V4 (Observation, FoI, Parameter)
 - Vervangt de OData-wrapper door een batch-specifieke wrapper voor **elke entiteit**
-- Voegt operatie-types toe (insert, update, deprecate)
+- Voegt operatie-types toe (insert, update, retract)
 - Voegt asynchrone verwerkingsstatus toe via per-entity endpoints
 - Blijft conform OAS 3.1 standaard
 - Voegt key-exchange mechanisme toe met **server-controlled string identifiers**

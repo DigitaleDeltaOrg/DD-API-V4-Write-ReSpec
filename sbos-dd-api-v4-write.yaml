@@ -187,7 +187,7 @@ ddApiV4Standaarden:
         vereist: "id (server ID)"
         verboden: "sourceId"
         response: "alleen id"
-      deprecate:
+      retract:
         clientVeld: "id"
         serverVeld: "id"
         vereist: "id (server ID)"
@@ -262,7 +262,7 @@ beveiligingsStandaarden:
   autorisatie:
     model: "Server-specifiek"
     principes:
-      - "Client MOET eigenaar zijn van entiteit voor UPDATE/DEPRECATE"
+      - "Client MOET eigenaar zijn van entiteit voor UPDATE/RETRACT"
       - "Eigenaar wordt bepaald via sourceId mapping"
     opmerkingen: "Niet gespecificeerd in standaard, implementatie-specifiek"
 
@@ -299,7 +299,7 @@ batchVerwerking:
     vereist: true
     foutafhandeling: "Mislukte callback = job fout"
 
-  operatieTypes:
+  operatieTypesObservation:
     - name: "insert"
       description: "Nieuwe entiteit toevoegen (CREATE)"
       vereist: "sourceId"
@@ -308,13 +308,23 @@ batchVerwerking:
       description: "Bestaande entiteit bijwerken (UPDATE)"
       vereist: "id (server ID)"
       verboden: "sourceId"
-    - name: "deprecate"
-      description: "Entiteit als vervallen markeren (DEPRECATE)"
+    - name: "retract"
+      description: "Entiteit terugtrekken (RETRACT)"
       vereist: "id (server ID)"
       verboden: "sourceId"
     - name: "delete"
       description: "Niet ondersteund"
-      opmerkingen: "Alleen deprecate is toegestaan"
+      opmerkingen: "Alleen retract is toegestaan"
+
+  operatieTypesEntities:
+    - name: "insert"
+      description: "Nieuwe entiteit toevoegen (CREATE)"
+      vereist: "sourceId"
+      verboden: "id"
+    - name: "update"
+      description: "Bestaande entiteit bijwerken (UPDATE)"
+      vereist: "id (server ID)"
+      verboden: "sourceId"
 
   batchOptions:
     - name: "continueOnError"

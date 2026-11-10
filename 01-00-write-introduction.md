@@ -16,11 +16,11 @@ DD API V4 Write gebruikt **per-entity endpoints** met een consistente namespace 
 
 ```
 /v4/write/observation/      ← Alle observation operaties
-├── POST                    ← Batch insert/update/deprecate
+├── POST                    ← Batch insert/update/retract
 └── GET {jobId}             ← Job status + resultaten (als klaar)
 
 /v4/write/foi/              ← Alle FoI operaties
-├── POST                    ← Batch insert/update/deprecate
+├── POST                    ← Batch insert/update
 └── GET {jobId}             ← Job status + resultaten (als klaar)
 
 /v4/write/parameter/        ← Alle parameter operaties
@@ -74,9 +74,9 @@ De Write module ondersteunt:
 - ✅ **Job status tracking** via per-entity endpoints (GET /write/{entity}/{jobId})
 - ✅ **Variable response**: GET /write/{entity}/{jobId} retourneert basisinformatie tijdens verwerking, en basis + resultaten wanneer klaar
 - ✅ **Server-controlled identifiers**: Server genereert altijd zelf identifiers (als string)
-- ❌ Geen delete operaties (alleen deprecate)
+- ❌ Geen delete operaties
+- ❌ Alleen retract (terugtrekken) voor observations
 - ❌ Geen individuele operaties (alleen batch)
-- ❌ Parameters kunnen niet worden gedeprecateerd
 
 ## Relatie met Andere Modules
 

@@ -8,7 +8,7 @@ Deze structuur vervangt de OData-wrapper en is specifiek ontworpen voor batch-op
 **Belangrijk**: Het DD API V4 Write module gebruikt **per-entity endpoints** in plaats van een enkele generieke batch endpoint.
 Dit betekent dat elk endpoint specifiek is voor één entiteitstype (observation, foi, of parameter) **en zijn eigen job tracking endpoint heeft**.
 
-> **🔴 CRITISCHE REGEL**: **De client mag NOOIT de server key dicteren**. De server genereert **altijd** zijn eigen identifier (als string) en retourneert deze. De client stuurt alleen zijn eigen `sourceId`, en de server bepaalt zelf wat de server-side identifier (`id`) wordt. Dit voorkomt key-conflicten tussen verschillende aanbieders en staat clients toe om elk gewenst ID-formaat te gebruiken.
+> **🔴 CRITISCHE REGEL**: **De client mag NOOIT de server key dicteren**. De server genereert **altijd** zijn eigen identifier (als string) en retourneert deze. De client stuurt alleen zijn eigen `clientId`, en de server bepaalt zelf wat de server-side identifier (`id`) wordt. Dit voorkomt key-conflicten tussen verschillende aanbieders en staat clients toe om elk gewenst ID-formaat te gebruiken.
 
 ## Endpoint Specifiek Design
 
@@ -38,7 +38,9 @@ Hierdoor:
 ## Batch Request Structuur
 
 Een batch-request bevat een verzameling operaties die moeten worden uitgevoerd op de specifieke entiteit.
-Elke operatie is van het type **insert**, **update**, of **deprecate**.
+Elke operatie is van het type **insert**, **update**, of **retract**. 
+
+Retract is alleen geldig voor observations.
 
 ### Root Object
 
@@ -64,10 +66,10 @@ properties:
 Elke operatie in de batch heeft de volgende structuur. **Merk op**: `entityType` is niet vereist omdat het endpoint dit al specificeert.
 
 **Vereenvoudigd Key-Exchange Model**:
-- **INSERT**: `sourceId` in request is **VEREIST**, `id` MOET afwezig/null zijn
-- **UPDATE**: `id` (server) in request is **VEREIST**, `sourceId` MOET afwezig/null zijn
-- **DEPRECATE**: `id` (server) in request is **VEREIST**, `sourceId` MOET afwezig/null zijn
-- In CREATE response: zowel `id` (server) als `sourceId` (client) worden geretourneerd
+- **INSERT**: `clientId` in request is **VEREIST**, `id` MOET een lege string zijn
+- **UPDATE**: `id` (server) in request is **VEREIST**, `clientId` MOET afwezig/null zijn
+- **RETRACT**: `id` (server) in request is **VEREIST**, `clientId` MOET afwezig/null zijn
+- In CREATE response: zowel `id` (server) als `clientId` (client) worden geretourneerd
 
 ```yaml
 type: object
@@ -77,7 +79,7 @@ required:
 properties:
   operation:
     type: string
-    enum: [insert, update, deprecate]
+    enum: [insert, update, retract]
     description: Het type operatie dat moet worden uitgevoerd
   data:
     type: object
@@ -85,8 +87,8 @@ properties:
     oneOf:
       - $ref: '#/components/schemas/CreateOperationData'
       - $ref: '#/components/schemas/UpdateOperationData'
-      - $ref: '#/components/schemas/DeprecateOperationData'
-  id:
+      - $ref: '#/components/schemas/RetractOperationData'
+  clientId:
     type: string
     maxLength: 100
     description: |-
@@ -100,14 +102,13 @@ properties:
 ### CreateOperationData (INSERT)
 
 Voor **insert** (CREATE) operaties:
-- `sourceId` is **VEREIST** - de client's identifier
-- `id` MOET **afwezig of null** zijn
-- Server genereert zijn eigen `id` (string) en retourneert zowel `id` als `sourceId`
+- `clientId` is **VEREIST** - de client's identifier
+- `id` MOET **een lege string** zijn
+- Server genereert zijn eigen `id` (string) en retourneert zowel `id` als `clientId`
 
 **Vereenvoudigde Key-Exchange Regels**:
-- **INSERT**: alleen `sourceId` in request, server retourneert `id` + `sourceId`
-- **UPDATE/DEPRECATE**: alleen `id` (server) in request, `sourceId` MOET afwezig zijn
-- **FoI en Parameter referenties**: MOETEN **server IDs (string)** zijn in alle operaties
+- **INSERT**: alleen `clientId` in request, server retourneert `id` + `clientId`
+- **UPDATE/RETRACT**: alleen `id` (server) in request, `clientId` MOET afwezig zijn
 
 **Endpoint specifieke data**:
 
@@ -123,14 +124,14 @@ CreateObservationData:
         - $ref: '#/components/schemas/DigitaleDelta.Observation'
         - type: object
           required:
-            - sourceId
+            - clientId
             - type
             - resultTime
             - phenomenonTime
             - parameter
             - modifiedOn
           properties:
-            sourceId:
+            clientId:
               type: string
               description: Client's identifier (VEREIST voor INSERT)
             id:
@@ -151,13 +152,13 @@ CreateFoiData:
         - $ref: '#/components/schemas/DigitaleDelta.Foi'
         - type: object
           required:
-            - sourceId
+            - clientId
             - type
             - name
             - location
             - geometry
           properties:
-            sourceId:
+            clientId:
               type: string
               description: Client's identifier (VEREIST voor INSERT)
             id:
@@ -178,11 +179,11 @@ CreateParameterData:
         - $ref: '#/components/schemas/DigitaleDelta.Parameter'
         - type: object
           required:
-            - sourceId
+            - clientId
             - name
             - definition
           properties:
-            sourceId:
+            clientId:
               type: string
               description: Client's identifier (VEREIST voor INSERT)
             id:
@@ -195,7 +196,7 @@ CreateParameterData:
 
 Voor **update** operaties:
 - `id` (server identifier) is **VEREIST**
-- `sourceId` MOET **afwezig of null** zijn
+- `clientId` MOET **afwezig of null** zijn
 - Alle entiteit-specifieke velden moeten aanwezig zijn
 
 Voor **POST /v4/write/observation** (UPDATE):
@@ -220,7 +221,7 @@ UpdateObservationData:
             id:
               type: string
               description: Server identifier (VEREIST voor UPDATE/DEPRECATE)
-            sourceId:
+            clientId:
               type: string
               nullable: true
               description: MOET null of afwezig zijn voor UPDATE
@@ -247,7 +248,7 @@ UpdateFoiData:
             id:
               type: string
               description: Server identifier (VEREIST voor UPDATE/DEPRECATE)
-            sourceId:
+            clientId:
               type: string
               nullable: true
               description: MOET null of afwezig zijn voor UPDATE
@@ -272,7 +273,7 @@ UpdateParameterData:
             id:
               type: string
               description: Server identifier (VEREIST voor UPDATE)
-            sourceId:
+            clientId:
               type: string
               nullable: true
               description: MOET null of afwezig zijn voor UPDATE
@@ -280,11 +281,11 @@ UpdateParameterData:
 
 ### DeprecateOperationData
 
-Voor deprecate-operaties bevat `data` de identificatie van de entiteit die moet worden gedeprecateerd.
+Voor retract-operaties bevat `data` de identificatie van de entiteit die moet worden gedeprecateerd.
 
 **Key-Exchange Regel**:
 - Het `id` veld MOET een **server ID (string)** zijn (van een eerdere create response)
-- `sourceId` MOET afwezig zijn
+- `clientId` MOET afwezig zijn
 - Parameters kunnen **niet** worden gedeprecateerd, alleen observaties en FoIs
 
 ```yaml
@@ -467,11 +468,11 @@ OperationResult:
     status:
       type: string
       enum: [succeeded, failed, skipped]
-    sourceId:
+    clientId:
       type: string
       nullable: true
       description: |-
-        De originele client sourceId (alleen bij INSERT operaties, voor traceerbaarheid).
+        De originele client clientId (alleen bij INSERT operaties, voor traceerbaarheid).
         Null voor UPDATE/DEPRECATE operaties.
     id:
       type: string
@@ -511,7 +512,7 @@ OperationResult:
       "id": "create-location-1",
       "data": {
         "foi": {
-          "sourceId": "my-location-001",      // Client's sourceId (VEREIST voor INSERT)
+          "clientId": "my-location-001",      // Client's clientId (VEREIST voor INSERT)
           "type": "http://definities.pdok.nl/def/cbsgb/1.0/id/datasetdefinitie/Top10NL",
           "name": "Meetlocatie Amsterdam",
           "organisation": "RWS",
@@ -533,13 +534,13 @@ OperationResult:
 }
 ```
 
-**Response**: Server retourneert zowel `sourceId` als gegenereerde `id` (server):
+**Response**: Server retourneert zowel `clientId` als gegenereerde `id` (server):
 ```json
 {
   "operationIndex": 0,
   "operationId": "create-location-1",
   "status": "succeeded",
-  "sourceId": "my-location-001",        // Client's sourceId
+  "clientId": "my-location-001",        // Client's clientId
   "id": "550e8400-e29b-41d4-a716-446655440002",  // Server gegenereerde ID (string)
   "messages": []
 }
@@ -555,7 +556,7 @@ OperationResult:
       "id": "create-obs-1",
       "data": {
         "observation": {
-          "sourceId": "my-observation-001",    // Client's sourceId (VEREIST voor INSERT)
+          "clientId": "my-observation-001",    // Client's clientId (VEREIST voor INSERT)
           "type": "measure",
           "resultTime": "2024-01-15T10:00:00Z",
           "phenomenonTime": {
@@ -616,7 +617,7 @@ OperationResult:
             }
           },
           "modifiedOn": "2024-01-15T11:00:00Z"
-          // sourceId MOET afwezig zijn
+          // clientId MOET afwezig zijn
         }
       }
     }
@@ -624,18 +625,18 @@ OperationResult:
 }
 ```
 
-### Voorbeeld 4: POST /v4/write/observation (Deprecate Observation)
+### Voorbeeld 4: POST /v4/write/observation (Retract Observation)
 
 ```json
 {
   "operations": [
     {
-      "operation": "deprecate",
-      "id": "deprecate-obs-1",
+      "operation": "retract",
+      "id": "retract-obs-1",
       "data": {
         "id": "550e8400-e29b-41d4-a716-446655440001",  // Server ID (string) - VEREIST
         "reason": "Foutieve meting, gecorrigeerd door nieuwe observatie"
-        // sourceId MOET afwezig zijn
+        // clientId MOET afwezig zijn
       }
     }
   ]
@@ -652,7 +653,7 @@ OperationResult:
       "id": "create-param-1",
       "data": {
         "parameter": {
-          "sourceId": "my-parameter-001",    // Client's sourceId (VEREIST voor INSERT)
+          "clientId": "my-parameter-001",    // Client's clientId (VEREIST voor INSERT)
           "name": "Waterhoogte",
           "definition": "http://definities.pdok.nl/def/imkl/1.0/id/waarnemingssoort/WATHTE"
         }
@@ -675,7 +676,7 @@ OperationResult:
           "id": "550e8400-e29b-41d4-a716-446655440004",  // Server ID (string) - VEREIST
           "name": "Waterhoogte (herzien)",
           "definition": "http://definities.pdok.nl/def/imkl/1.0/id/waarnemingssoort/WATHTE"
-          // sourceId MOET afwezig zijn
+          // clientId MOET afwezig zijn
         }
       }
     }
@@ -683,18 +684,18 @@ OperationResult:
 }
 ```
 
-### Voorbeeld 7: POST /v4/write/foi (Deprecate FoI)
+### Voorbeeld 7: POST /v4/write/foi (Retract FoI)
 
 ```json
 {
   "operations": [
     {
-      "operation": "deprecate",
-      "id": "deprecate-foi-1",
+      "operation": "retract",
+      "id": "retract-foi-1",
       "data": {
         "id": "550e8400-e29b-41d4-a716-446655440002",  // Server ID (string) - VEREIST
         "reason": "Locatie niet meer in gebruik"
-        // sourceId MOET afwezig zijn
+        // clientId MOET afwezig zijn
       }
     }
   ]
@@ -726,7 +727,7 @@ Stel je voor dat de volgende request is verstuurd naar `/v4/write/observation`:
       "id": "create-obs-1",
       "data": {
         "observation": {
-          "sourceId": "my-observation-001",    // Client's sourceId
+          "clientId": "my-observation-001",    // Client's clientId
           "type": "measure",
           "resultTime": "2024-01-15T10:00:00Z",
           "phenomenonTime": {
@@ -743,8 +744,8 @@ Stel je voor dat de volgende request is verstuurd naar `/v4/write/observation`:
       }
     },
     {
-      "operation": "deprecate",
-      "id": "deprecate-obs-1",
+      "operation": "retract",
+      "id": "retract-obs-1",
       "data": {
         "id": "550e8400-e29b-41d4-a716-446655449999"  // Server ID (string)
       }
@@ -782,15 +783,15 @@ Stel je voor dat de volgende request is verstuurd naar `/v4/write/observation`:
       "operationIndex": 0,
       "operationId": "create-obs-1",
       "status": "succeeded",
-      "sourceId": "my-observation-001",         // Client's sourceId
+      "clientId": "my-observation-001",         // Client's clientId
       "id": "550e8400-e29b-41d4-a716-446655440001",  // Server gegenereerde ID (string)
       "messages": []
     },
     {
       "operationIndex": 1,
-      "operationId": "deprecate-obs-1",
+      "operationId": "retract-obs-1",
       "status": "succeeded",
-      "sourceId": null,
+      "clientId": null,
       "id": "550e8400-e29b-41d4-a716-446655449999",  // Server ID (string)
       "messages": []
     }
@@ -818,7 +819,7 @@ Response van `GET /v4/write/observation/{jobId}`:
       "operationIndex": 0,
       "operationId": "op1",
       "status": "succeeded",
-      "sourceId": "my-observation-001",
+      "clientId": "my-observation-001",
       "id": "550e8400-e29b-41d4-a716-446655440003",
       "messages": []
     },
@@ -826,12 +827,12 @@ Response van `GET /v4/write/observation/{jobId}`:
       "operationIndex": 1,
       "operationId": "op2",
       "status": "failed",
-      "sourceId": null,
+      "clientId": null,
       "id": null,
       "messages": [
         {
           "code": "INVALID_REQUEST",
-          "message": "For UPDATE operation: id is required, sourceId must be absent",
+          "message": "For UPDATE operation: id is required, clientId must be absent",
           "severity": "error",
           "path": "/operations/1/data/observation"
         }
@@ -844,26 +845,26 @@ Response van `GET /v4/write/observation/{jobId}`:
 
 ## Samenvatting Key-Exchange in Batch Structuur
 
-| Scenario | Endpoint | Request veld | Response `sourceId` | Response `id` | Notities |
+| Scenario | Endpoint | Request veld | Response `clientId` | Response `id` | Notities |
 |----------|----------|--------------|---------------------|---------------|----------|
-| Insert Observation | POST /write/observation | `sourceId` **VEREIST**, `id` MOET afwezig | Client sourceId | Server ID (string) | Server genereert altijd zelf ID (string) |
-| Update Observation | POST /write/observation | `id` (server) **VEREIST**, `sourceId` MOET afwezig | null | Server ID (string) | MOET server ID (string) zijn |
-| Deprecate Observation | POST /write/observation | `id` (server) **VEREIST**, `sourceId` MOET afwezig | null | Server ID (string) | MOET server ID (string) zijn |
-| Insert FoI | POST /write/foi | `sourceId` **VEREIST**, `id` MOET afwezig | Client sourceId | Server ID (string) | Server genereert altijd zelf ID (string) |
-| Update FoI | POST /write/foi | `id` (server) **VEREIST**, `sourceId` MOET afwezig | null | Server ID (string) | MOET server ID (string) zijn |
-| Deprecate FoI | POST /write/foi | `id` (server) **VEREIST**, `sourceId` MOET afwezig | null | Server ID (string) | MOET server ID (string) zijn |
-| Insert Parameter | POST /write/parameter | `sourceId` **VEREIST**, `id` MOET afwezig | Client sourceId | Server ID (string) | Server genereert altijd zelf ID (string) |
-| Update Parameter | POST /write/parameter | `id` (server) **VEREIST**, `sourceId` MOET afwezig | null | Server ID (string) | MOET server ID (string) zijn |
+| Insert Observation | POST /write/observation | `clientId` **VEREIST**, `id` MOET afwezig | Client clientId | Server ID (string) | Server genereert altijd zelf ID (string) |
+| Update Observation | POST /write/observation | `id` (server) **VEREIST**, `clientId` MOET afwezig | null | Server ID (string) | MOET server ID (string) zijn |
+| Retract Observation | POST /write/observation | `id` (server) **VEREIST**, `clientId` MOET afwezig | null | Server ID (string) | MOET server ID (string) zijn |
+| Insert FoI | POST /write/foi | `clientId` **VEREIST**, `id` MOET afwezig | Client clientId | Server ID (string) | Server genereert altijd zelf ID (string) |
+| Update FoI | POST /write/foi | `id` (server) **VEREIST**, `clientId` MOET afwezig | null | Server ID (string) | MOET server ID (string) zijn |
+| Retract FoI | POST /write/foi | `id` (server) **VEREIST**, `clientId` MOET afwezig | null | Server ID (string) | MOET server ID (string) zijn |
+| Insert Parameter | POST /write/parameter | `clientId` **VEREIST**, `id` MOET afwezig | Client clientId | Server ID (string) | Server genereert altijd zelf ID (string) |
+| Update Parameter | POST /write/parameter | `id` (server) **VEREIST**, `clientId` MOET afwezig | null | Server ID (string) | MOET server ID (string) zijn |
 
 > **🔴 CRITISCHE REGELS**:
 >
 > 1. **De client mag NOOIT de server ID dicteren** - de server genereert deze altijd zelf als **string**
-> 2. **INSERT**: alleen `sourceId` in request, `id` MOET afwezig zijn
-> 3. **UPDATE/DEPRECATE**: alleen `id` (server) in request, `sourceId` MOET afwezig zijn
-> 4. Clients kunnen **elk ID-formaat** gebruiken voor `sourceId`
+> 2. **INSERT**: alleen `clientId` in request, `id` MOET afwezig zijn
+> 3. **UPDATE/DEPRECATE**: alleen `id` (server) in request, `clientId` MOET afwezig zijn
+> 4. Clients kunnen **elk ID-formaat** gebruiken voor `clientId`
 > 5. **Server IDs zijn altijd strings** - het formaat wordt door de server bepaald
-> 6. Bij INSERT response: server retourneert zowel `sourceId` als `id`
-> 7. Bij UPDATE/DEPRECATE response: server retourneert alleen `id` (sourceId is null)
+> 6. Bij INSERT response: server retourneert zowel `clientId` als `id`
+> 7. Bij UPDATE/DEPRECATE response: server retourneert alleen `id` (clientId is null)
 > 8. FoI en Parameter referenties **MOETEN server IDs (string)** zijn
 
 ## Job Status Endpoint

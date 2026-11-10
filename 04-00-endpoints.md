@@ -11,9 +11,9 @@ Elke entiteit heeft zijn eigen endpoint voor batch-operaties **inclusief job tra
 
 | Endpoint                        | Methode | Beschrijving                                   | Entiteit    |
 |---------------------------------|---------|------------------------------------------------|-------------|
-| `/v4/write/observation`         | POST    | Batch insert/update/deprecate van observaties  | Observation |
+| `/v4/write/observation`         | POST    | Batch insert/update/retract van observaties    | Observation |
 | `/v4/write/observation/{jobId}` | GET     | Opvragen status en resultaten van een job      | Observation |
-| `/v4/write/foi`                 | POST    | Batch insert/update/deprecate van meetobjecten | FoI         |
+| `/v4/write/foi`                 | POST    | Batch insert/update van meetobjecten           | FoI         |
 | `/v4/write/foi/{jobId}`         | GET     | Opvragen status en resultaten van een job      | FoI         |
 | `/v4/write/parameter`           | POST    | Batch insert/update van parameters             | Parameter   |
 | `/v4/write/parameter/{jobId}`   | GET     | Opvragen status en resultaten van een job      | Parameter   |
@@ -42,7 +42,7 @@ Elke entiteit heeft zijn eigen endpoint voor batch-operaties **inclusief job tra
 
 #### Beschrijving
 
-Verstuur een batch van **insert**, **update**, en **deprecate** operaties voor **observaties**. De operaties worden asynchroon verwerkt.
+Verstuur een batch van **insert**, **update**, en **retract** operaties voor **observaties**. De operaties worden asynchroon verwerkt.
 
 #### Request
 
@@ -55,9 +55,10 @@ Verstuur een batch van **insert**, **update**, en **deprecate** operaties voor *
     {
       "operation": "insert",
       "id": "op1",
+      "clientId": "my-observation-001",
       "data": {
         "observation": {
-          "sourceId": "my-observation-001",    // Client's sourceId (VEREIST voor INSERT)
+          "id": "",
           "type": "measure",
           "resultTime": "2024-01-15T10:00:00Z",
           "phenomenonTime": {
@@ -111,10 +112,10 @@ Verstuur een batch van **insert**, **update**, en **deprecate** operaties voor *
       }
     },
     {
-      "operation": "deprecate",
+      "operation": "retract",
       "id": "op3",
       "data": {
-        "id": "550e8400-e29b-41d4-a716-446655440003",  // Server ID (string) VEREIST
+        "id": "550e8400-e29b-41d4-a716-446655440003",
         "reason": "Foutieve meting"
       }
     }
@@ -129,11 +130,11 @@ Verstuur een batch van **insert**, **update**, en **deprecate** operaties voor *
 **Operaties**:
 - `insert`: Nieuwe observatie toevoegen (CREATE)
 - `update`: Bestaande observatie bijwerken (UPDATE)
-- `deprecate`: Observatie deprecaten
+- `retract`: Observatie retracten
 
 **Key Exchange Regels**:
-- **INSERT**: `sourceId` VEREIST, `id` MOET afwezig zijn
-- **UPDATE/DEPRECATE**: `id` (server) VEREIST, `sourceId` MOET afwezig zijn
+- **INSERT**: `clientId` VEREIST (op operation niveau), `id` MOET "" zijn
+- **UPDATE/RETRACT**: `id` (server) VEREIST, `clientId` MOET afwezig zijn
 
 #### Response
 
@@ -211,25 +212,75 @@ Opvragen van de status en (als de job voltooid is) de resultaten van een observa
     {
       "operationIndex": 0,
       "operationId": "op1",
+      "action": "insert",
+      "clientId": "my-observation-001",
       "status": "succeeded",
-      "sourceId": "my-observation-001",        // Client's sourceId (alleen bij INSERT)
-      "id": "550e8400-e29b-41d4-a716-446655440001",  // Server ID (string)
+      "data": {
+        "id": "550e8400-e29b-41d4-a716-446655440001",
+        "type": "measure",
+        "resultTime": "2024-01-15T10:00:00Z",
+        "phenomenonTime": {
+          "begin": "2024-01-15T10:00:00Z",
+          "end": "2024-01-15T10:00:00Z"
+        },
+        "parameter": {
+          "parameter/waarnemingssoort": "WATHTE"
+        },
+        "foi": {
+          "id": "550e8400-e29b-41d4-a716-446655440002"
+        },
+        "result": {
+          "id": "my-result-001",
+          "measure": {
+            "uom": "m",
+            "value": 1.5
+          }
+        },
+        "modifiedOn": "2024-01-15T10:00:00Z"
+      },
       "messages": []
     },
     {
       "operationIndex": 1,
       "operationId": "op2",
+      "action": "update",
+      "clientId": null,
       "status": "succeeded",
-      "sourceId": null,                        // null voor UPDATE
-      "id": "550e8400-e29b-41d4-a716-446655440002",  // Server ID (string)
+      "data": {
+        "id": "550e8400-e29b-41d4-a716-446655440001",
+        "type": "measure",
+        "resultTime": "2024-01-15T11:00:00Z",
+        "phenomenonTime": {
+          "begin": "2024-01-15T11:00:00Z",
+          "end": "2024-01-15T11:00:00Z"
+        },
+        "parameter": {
+          "parameter/waarnemingssoort": "WATHTE"
+        },
+        "foi": {
+          "id": "550e8400-e29b-41d4-a716-446655440002"
+        },
+        "result": {
+          "id": "result-001",
+          "measure": {
+            "uom": "m",
+            "value": 1.6
+          }
+        },
+        "modifiedOn": "2024-01-15T11:00:00Z"
+      },
       "messages": []
     },
     {
       "operationIndex": 2,
       "operationId": "op3",
+      "action": "retract",
+      "clientId": null,
       "status": "succeeded",
-      "sourceId": null,                        // null voor DEPRECATE
-      "id": "550e8400-e29b-41d4-a716-446655440003",  // Server ID (string)
+      "data": {
+        "id": "550e8400-e29b-41d4-a716-446655440003",
+        "reason": "Foutieve meting"
+      },
       "messages": []
     }
   ],
@@ -243,7 +294,7 @@ Opvragen van de status en (als de job voltooid is) de resultaten van een observa
 
 #### Beschrijving
 
-Verstuur een batch van **insert**, **update**, en **deprecate** operaties voor **Features of Interest (meetobjecten)**.
+Verstuur een batch van **insert** en **update** operaties voor **Features of Interest (meetobjecten)**.
 
 #### Request
 
@@ -256,9 +307,10 @@ Verstuur een batch van **insert**, **update**, en **deprecate** operaties voor *
     {
       "operation": "insert",
       "id": "op1",
+      "clientId": "my-location-001",
       "data": {
         "foi": {
-          "sourceId": "my-location-001",      // Client's sourceId (VEREIST voor INSERT)
+          "id": "",
           "type": "http://definities.pdok.nl/def/cbsgb/1.0/id/datasetdefinitie/Top10NL",
           "name": "Meetlocatie Amsterdam",
           "organisation": "RWS",
@@ -277,7 +329,7 @@ Verstuur een batch van **insert**, **update**, en **deprecate** operaties voor *
       "id": "op2",
       "data": {
         "foi": {
-          "id": "550e8400-e29b-41d4-a716-446655440002",  // Server ID (string) VEREIST
+          "id": "550e8400-e29b-41d4-a716-446655440002",
           "type": "http://definities.pdok.nl/def/cbsgb/1.0/id/datasetdefinitie/Top10NL",
           "name": "Meetlocatie Amsterdam Centraal",
           "organisation": "RWS",
@@ -289,14 +341,6 @@ Verstuur een batch van **insert**, **update**, en **deprecate** operaties voor *
             "coordinates": [4.9, 52.37]
           }
         }
-      }
-    },
-    {
-      "operation": "deprecate",
-      "id": "op3",
-      "data": {
-        "id": "550e8400-e29b-41d4-a716-446655440003",  // Server ID (string) VEREIST
-        "reason": "Locatie niet meer in gebruik"
       }
     }
   ]
@@ -326,7 +370,7 @@ Opvragen van de status en resultaten van een FoI batch-job.
 
 Verstuur een batch van **insert** en **update** operaties voor **parameters**.
 
-**Belangrijk**: Parameters kunnen niet worden gedeprecateerd.
+**Belangrijk**: Parameters kunnen niet worden geretracteerd.
 
 #### Request
 
@@ -339,9 +383,10 @@ Verstuur een batch van **insert** en **update** operaties voor **parameters**.
     {
       "operation": "insert",
       "id": "op1",
+      "clientId": "my-parameter-001",
       "data": {
         "parameter": {
-          "sourceId": "my-parameter-001",    // Client's sourceId (VEREIST voor INSERT)
+          "id": "",
           "name": "Waterhoogte",
           "definition": "http://definities.pdok.nl/def/imkl/1.0/id/waarnemingssoort/WATHTE"
         }
@@ -352,7 +397,7 @@ Verstuur een batch van **insert** en **update** operaties voor **parameters**.
       "id": "op2",
       "data": {
         "parameter": {
-          "id": "550e8400-e29b-41d4-a716-446655440004",  // Server ID (string) VEREIST
+          "id": "550e8400-e29b-41d4-a716-446655440004",
           "name": "Waterhoogte (herzien)",
           "definition": "http://definities.pdok.nl/def/imkl/1.0/id/waarnemingssoort/WATHTE"
         }
@@ -459,11 +504,11 @@ Elke entiteit heeft zijn eigen **namespace** onder `/v4/write/` met **twee endpo
 
 ```
 /v4/write/observation/    ← Observation namespace
-├── POST                  ← Batch insert/update/deprecate
+├── POST                  ← Batch insert/update/retract
 └── GET {jobId}           ← Job status + resultaten
 
 /v4/write/foi/            ← FoI namespace
-├── POST                  ← Batch insert/update/deprecate
+├── POST                  ← Batch insert/update
 └── GET {jobId}           ← Job status + resultaten
 
 /v4/write/parameter/      ← Parameter namespace
@@ -478,4 +523,4 @@ Deze structuur zorgt voor:
 - ✅ **Eenvoud**: Slechts 2 endpoints per entiteit
 - ✅ **Efficiëntie**: Één request voor status + resultaten
 - ✅ **RESTful design**: Resources nested op logische manier
-- ✅ **Vereenvoudigd Key Exchange**: INSERT met sourceId, UPDATE/DEPRECATE met server id
+- ✅ **Vereenvoudigd Key Exchange**: INSERT met clientId (op operation niveau), UPDATE/RETRACT met server id

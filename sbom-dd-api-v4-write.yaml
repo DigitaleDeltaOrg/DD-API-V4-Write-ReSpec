@@ -12,7 +12,7 @@ metadata:
     type: "application"
     name: "DD API V4 Write Module"
     version: "4.0.0"
-    description: "Digitale Delta API V4 Write Module - Batch verwerking voor het inserten, updaten en deprecaten van data."
+    description: "Digitale Delta API V4 Write Module - Batch verwerking voor het inserten, updaten en retracteren van data."
     licenses:
       - license:
           id: "CC-BY-4.0"
