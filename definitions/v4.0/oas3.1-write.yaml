@@ -2,10 +2,10 @@ openapi: 3.1.0
 info:
   title: DD-API-V4 Write Module
   description: |
-    Digitale Delta API V4 Write Module - Batch verwerking voor het upserten en deprecaten van data.
+    Digitale Delta API V4 Write Module - Batch verwerking voor het toevoegen/wijzigen/terugtrekken van data.
     
     Deze module voegt schrijf-functionaliteit toe aan DD API V4. Het biedt een batch-gebaseerde
-    methode voor het toevoegen, bijwerken en deprecaten van observaties, meetobjecten en parameters.
+    methode voor het toevoegen, bijwerken en terugtrekken van observaties, meetobjecten en parameters.
     
     ## Belangrijke Kenmerken
     
@@ -51,7 +51,7 @@ paths:
         - Observation
       summary: Submit a batch of observation operations
       description: |
-        Submit a batch of upsert and deprecate operations for observations only.
+        Submit a batch of insert, update and retract operations for observations only.
         The operations are processed asynchronously and return a job ID for tracking.
         
         **Job status and results can be retrieved from:**
@@ -68,15 +68,15 @@ paths:
         om elk gewenst ID-formaat voor hun eigen identifiers te gebruiken.
         
         **Bij INSERT (eerste keer een observatie toevoegen):**
-        - Client stuurt data met eigen `sourceId` (kan elk formaat zijn)
-        - `id` MOET afwezig zijn
+        - Client stuurt `clientId` (op operation niveau, kan elk formaat zijn)
+        - `observation.id` MOET lege string "" zijn
         - **Server genereert altijd zelf een server ID (string)**
-        - Response bevat zowel `sourceId` als `id`
+        - Response bevat zowel `clientId` als `id`
         
-        **Bij UPDATE/DEPRECATE (vervolgoperaties):**
-        - Client MOET de **server ID (string)** gebruiken in het `id` veld
-        - `sourceId` MOET afwezig zijn
-        - Gebruik van sourceId in update/deprecate resulteert in fout `SOURCEID_NOT_ALLOWED`
+        **Bij UPDATE/RETRACT (vervolgoperaties):**
+        - Client MOET de **server ID (string)** gebruiken in `observation.id`
+        - `clientId` MOET afwezig zijn
+        - Gebruik van clientId in update/retract resulteert in fout `CLIENTID_NOT_ALLOWED`
         
         **Voor FoI referenties:**
         - FoI referenties MOETEN **server IDs (string)** zijn (van eerdere create operaties)
@@ -91,15 +91,16 @@ paths:
               insertObservation:
                 summary: Insert new observation (CREATE)
                 description: |
-                  INSERT operation: sourceId REQUIRED, id MUST be absent/null
-                  Server will return both server id and sourceId in response
+                  INSERT operation: clientId REQUIRED at operation level, observation.id must be ""
+                  Server will return both server id and clientId in response
                 value:
                   operations:
                     - operation: insert
                       id: "op1"
+                      clientId: "client-obs-001"
                       data:
                         observation:
-                          sourceId: "client-obs-001"
+                          id: ""
                           type: "measure"
                           resultTime: "2024-01-15T10:00:00Z"
                           phenomenonTime:
@@ -118,7 +119,7 @@ paths:
               updateObservation:
                 summary: Update existing observation (UPDATE)
                 description: |
-                  UPDATE operation: id (server) REQUIRED, sourceId MUST be absent/null
+                  UPDATE operation: observation.id (server) REQUIRED, clientId must be absent
                 value:
                   operations:
                     - operation: update
@@ -141,13 +142,13 @@ paths:
                               uom: "m"
                               value: 1.6
                           modifiedOn: "2024-01-15T10:00:00Z"
-              deprecateObservation:
-                summary: Deprecate observation
+              retractObservation:
+                summary: Retract observation
                 description: |
-                  DEPRECATE operation: id (server) REQUIRED, sourceId MUST be absent/null
+                  RETRACT operation: observation.id (server) REQUIRED, clientId must be absent
                 value:
                   operations:
-                    - operation: deprecate
+                    - operation: retract
                       id: "op3"
                       data:
                         id: "550e8400-e29b-41d4-a716-446655440001"
@@ -230,7 +231,7 @@ paths:
         - FoI
       summary: Submit a batch of FoI operations
       description: |
-        Submit a batch of upsert and deprecate operations for Features of Interest only.
+        Submit a batch of insert and update operations for Features of Interest only.
         The operations are processed asynchronously and return a job ID for tracking.
         
         **Job status and results can be retrieved from:**
@@ -241,9 +242,10 @@ paths:
         **De client mag NOOIT de server ID dicteren**
         De server genereert altijd zelf de server ID (als string) en retourneert deze.
         
-        **Bij INSERT:** Client stuurt FoI met eigen `sourceId` (kan elk formaat zijn), 
-        **server genereert altijd zelf een server ID (string)**, retourneert sourceId + id
-        **Bij UPDATE/DEPRECATE:** Client MOET de **server ID (string)** gebruiken, sourceId MOET afwezig zijn
+        **Bij INSERT:** Client stuurt `clientId` (op operation niveau, kan elk formaat zijn), 
+        `foi.id` MOET lege string "" zijn, **server genereert altijd zelf een server ID (string)**, 
+        retourneert clientId + id
+        **Bij UPDATE:** Client MOET de **server ID (string)** gebruiken in `foi.id`, clientId MOET afwezig zijn
       operationId: write.foi.submitBatch
       requestBody:
         required: true
@@ -255,15 +257,16 @@ paths:
               insertFoi:
                 summary: Insert new FoI (CREATE)
                 description: |
-                  INSERT operation: sourceId REQUIRED, id MUST be absent/null
-                  Server will return both server id and sourceId in response
+                  INSERT operation: clientId REQUIRED at operation level, foi.id must be ""
+                  Server will return both server id and clientId in response
                 value:
                   operations:
                     - operation: insert
                       id: "op1"
+                      clientId: "client-foi-001"
                       data:
                         foi:
-                          sourceId: "client-foi-001"
+                          id: ""
                           type: "http://definities.pdok.nl/def/cbsgb/1.0/id/datasetdefinitie/Top10NL"
                           name: "Meetlocatie Amsterdam"
                           organisation: "RWS"
@@ -276,7 +279,7 @@ paths:
               updateFoi:
                 summary: Update existing FoI (UPDATE)
                 description: |
-                  UPDATE operation: id (server) REQUIRED, sourceId MUST be absent/null
+                  UPDATE operation: foi.id (server) REQUIRED, clientId must be absent
                 value:
                   operations:
                     - operation: update
@@ -293,17 +296,6 @@ paths:
                           geometry:
                             type: "Point"
                             coordinates: [4.9, 52.37]
-              deprecateFoi:
-                summary: Deprecate FoI
-                description: |
-                  DEPRECATE operation: id (server) REQUIRED, sourceId MUST be absent/null
-                value:
-                  operations:
-                    - operation: deprecate
-                      id: "op3"
-                      data:
-                        id: "550e8400-e29b-41d4-a716-446655440003"
-                        reason: "Locatie niet meer in gebruik"
       responses:
         '202':
           description: Batch accepted for processing
@@ -371,7 +363,7 @@ paths:
       summary: Submit a batch of parameter operations
       description: |
         Submit a batch of upsert operations for parameters only.
-        Note: Parameters cannot be deprecated, only upserted.
+        Note: Parameters cannot be retracted, only inserted or updated.
         The operations are processed asynchronously and return a job ID for tracking.
         
         **Job status and results can be retrieved from:**
@@ -382,9 +374,10 @@ paths:
         **De client mag NOOIT de server ID dicteren**
         De server genereert altijd zelf de server ID (als string) en retourneert deze.
         
-        **Bij INSERT:** Client stuurt parameter met eigen `sourceId` (kan elk formaat zijn), 
-        **server genereert altijd zelf een server ID (string)**, retourneert sourceId + id
-        **Bij UPDATE:** Client MOET de **server ID (string)** gebruiken, sourceId MOET afwezig zijn
+        **Bij INSERT:** Client stuurt `clientId` (op operation niveau, kan elk formaat zijn), 
+        `parameter.id` MOET lege string "" zijn, **server genereert altijd zelf een server ID (string)**, 
+        retourneert clientId + id
+        **Bij UPDATE:** Client MOET de **server ID (string)** gebruiken in `parameter.id`, clientId MOET afwezig zijn
       operationId: write.parameter.submitBatch
       requestBody:
         required: true
@@ -396,21 +389,22 @@ paths:
               insertParameter:
                 summary: Insert new parameter (CREATE)
                 description: |
-                  INSERT operation: sourceId REQUIRED, id MUST be absent/null
-                  Server will return both server id and sourceId in response
+                  INSERT operation: clientId REQUIRED at operation level, parameter.id must be ""
+                  Server will return both server id and clientId in response
                 value:
                   operations:
                     - operation: insert
                       id: "op1"
+                      clientId: "client-param-001"
                       data:
                         parameter:
-                          sourceId: "client-param-001"
+                          id: ""
                           name: "Waterhoogte"
                           definition: "http://definities.pdok.nl/def/imkl/1.0/id/waarnemingssoort/WATHTE"
               updateParameter:
                 summary: Update existing parameter (UPDATE)
                 description: |
-                  UPDATE operation: id (server) REQUIRED, sourceId MUST be absent/null
+                  UPDATE operation: parameter.id (server) REQUIRED, clientId must be absent
                 value:
                   operations:
                     - operation: update
@@ -546,26 +540,31 @@ components:
         Operation for observation entity.
         
         **Key Exchange Rules:**
-        - INSERT: sourceId REQUIRED, id MUST be absent/null
-        - UPDATE/DEPRECATE: id REQUIRED, sourceId MUST be absent/null
+        - INSERT: clientId REQUIRED (at operation level), observation.id must be ""
+        - UPDATE/RETRACT: observation.id REQUIRED (server ID), clientId must be absent
       properties:
         operation:
           type: string
-          enum: [insert, update, deprecate]
-          description: The type of operation to perform (insert, update, or deprecate)
+          enum: [insert, update, retract]
+          description: The type of operation to perform (insert, update or retract)
+        clientId:
+          type: string
+          description: |
+            Client identifier for the entity (only for INSERT operations).
+            Must match the clientId in the data section.
         data:
           type: object
           description: The data for this operation
           oneOf:
             - $ref: '#/components/schemas/CreateObservationData'
             - $ref: '#/components/schemas/UpdateObservationData'
-            - $ref: '#/components/schemas/DeprecateObservationData'
+            - $ref: '#/components/schemas/RetractObservationData'
           discriminator:
             propertyName: operation
             mapping:
               insert: '#/components/schemas/CreateObservationData'
               update: '#/components/schemas/UpdateObservationData'
-              deprecate: '#/components/schemas/DeprecateObservationData'
+              retract: '#/components/schemas/RetractObservationData'
         id:
           type: string
           maxLength: 100
@@ -581,26 +580,29 @@ components:
         Operation for FoI entity.
         
         **Key Exchange Rules:**
-        - INSERT: sourceId REQUIRED, id MUST be absent/null
-        - UPDATE/DEPRECATE: id REQUIRED, sourceId MUST be absent/null
+        - INSERT: clientId REQUIRED (at operation level), foi.id must be ""
+        - UPDATE: foi.id REQUIRED (server ID), clientId must be absent
       properties:
         operation:
           type: string
-          enum: [insert, update, deprecate]
-          description: The type of operation to perform (insert, update, or deprecate)
+          enum: [insert, update]
+          description: The type of operation to perform (insert or update)
+        clientId:
+          type: string
+          description: |
+            Client identifier for the entity (only for INSERT operations).
+            Must match the clientId in the data section.
         data:
           type: object
           description: The data for this operation
           oneOf:
             - $ref: '#/components/schemas/CreateFoiData'
             - $ref: '#/components/schemas/UpdateFoiData'
-            - $ref: '#/components/schemas/DeprecateFoiData'
           discriminator:
             propertyName: operation
             mapping:
               insert: '#/components/schemas/CreateFoiData'
               update: '#/components/schemas/UpdateFoiData'
-              deprecate: '#/components/schemas/DeprecateFoiData'
         id:
           type: string
           maxLength: 100
@@ -616,15 +618,20 @@ components:
         Operation for parameter entity.
         
         **Key Exchange Rules:**
-        - INSERT: sourceId REQUIRED, id MUST be absent/null
-        - UPDATE: id REQUIRED, sourceId MUST be absent/null
+        - INSERT: clientId REQUIRED (at operation level), parameter.id must be ""
+        - UPDATE: parameter.id REQUIRED (server ID), clientId must be absent
         
-        Note: Parameters typically don't support deprecate operations.
+        Note: Parameters don't support retract operations.
       properties:
         operation:
           type: string
           enum: [insert, update]
           description: The type of operation to perform (insert or update for parameters)
+        clientId:
+          type: string
+          description: |
+            Client identifier for the entity (only for INSERT operations).
+            Must match the clientId in the data section.
         data:
           type: object
           description: The data for this operation
@@ -645,33 +652,34 @@ components:
       title: Create Observation Data
       type: object
       required:
+        - clientId
         - observation
-      description: Data for creating a new observation (INSERT)
+      description: |
+        Data for creating a new observation (INSERT)
+        
+        **Key Exchange:**
+        - `clientId`: REQUIRED - Client's identifier for the new observation (any format)
+        - `observation.id`: MUST be empty string "" for CREATE operations
       properties:
+        clientId:
+          type: string
+          description: Client's identifier for the new observation (REQUIRED for CREATE, any format)
         observation:
           allOf:
             - $ref: '#/components/schemas/DigitaleDelta.Observation'
             - type: object
               required:
-                - sourceId
+                - id
                 - type
                 - resultTime
                 - phenomenonTime
                 - parameter
                 - modifiedOn
               properties:
-                sourceId:
-                  type: string
-                  description: Client's identifier for the new observation (REQUIRED for CREATE)
                 id:
                   type: string
-                  nullable: true
-                  description: MUST be null or absent for CREATE operations
-                clientId:
-                  type: string
-                  nullable: true
-                  deprecated: true
-                  description: Deprecated - use sourceId instead
+                  enum: [""]
+                  description: MUST be empty string "" for CREATE operations
 
     UpdateObservationData:
       title: Update Observation Data
@@ -694,81 +702,65 @@ components:
               properties:
                 id:
                   type: string
-                  description: Server identifier for the observation (REQUIRED for UPDATE/DEPRECATE)
-                sourceId:
-                  type: string
-                  nullable: true
-                  description: MUST be null or absent for UPDATE operations
+                  description: Server identifier for the observation (REQUIRED for UPDATE/RETRACT, from previous CREATE response)
                 clientId:
                   type: string
                   nullable: true
-                  deprecated: true
-                  description: Deprecated - not used for UPDATE
+                  readOnly: true
+                  description: MUST be null or absent for UPDATE operations
 
-    UpsertObservationData:
-      title: Upsert Observation Data
-      type: object
-      description: Data for upserting an observation (CREATE or UPDATE)
-      oneOf:
-        - $ref: '#/components/schemas/CreateObservationData'
-        - $ref: '#/components/schemas/UpdateObservationData'
-      discriminator:
-        propertyName: observation
-        mapping:
-          sourceId: '#/components/schemas/CreateObservationData'
-          id: '#/components/schemas/UpdateObservationData'
-
-    DeprecateObservationData:
-      title: Deprecate Observation Data
+    RetractObservationData:
+      title: Retract Observation Data
       type: object
       required:
         - id
         - reason
-      description: Data for deprecating an observation
+      description: Data for retracting an observation
       properties:
         id:
           type: string
-          description: Server ID (string) of the observation to deprecate (MUST be server-generated)
+          description: Server ID (string) of the observation to retract (MUST be server-generated, from previous CREATE response)
         reason:
           type: string
           minLength: 1
           maxLength: 1000
-          description: The reason for deprecation
+          description: The reason for retraction
         effectiveDate:
           type: string
           format: date-time
-          description: Date when the deprecation takes effect
+          description: Date when the retraction takes effect
 
     CreateFoiData:
       title: Create FoI Data
       type: object
       required:
+        - clientId
         - foi
-      description: Data for creating a new FoI (INSERT)
+      description: |
+        Data for creating a new FoI (INSERT)
+        
+        **Key Exchange:**
+        - `clientId`: REQUIRED - Client's identifier for the new FoI (any format)
+        - `foi.id`: MUST be empty string "" for CREATE operations
       properties:
+        clientId:
+          type: string
+          description: Client's identifier for the new FoI (REQUIRED for CREATE, any format)
         foi:
           allOf:
             - $ref: '#/components/schemas/DigitaleDelta.Foi'
             - type: object
               required:
-                - sourceId
+                - id
                 - type
                 - name
                 - location
                 - geometry
               properties:
-                sourceId:
-                  type: string
-                  description: Client's identifier for the new FoI (REQUIRED for CREATE)
                 id:
                   type: string
-                  nullable: true
-                  description: MUST be null or absent for CREATE operations
-                clientId:
-                  type: string
-                  nullable: true
-                  deprecated: true
-                  description: Deprecated - use sourceId instead
+                  enum: [""]
+                  description: MUST be empty string "" for CREATE operations
 
     UpdateFoiData:
       title: Update FoI Data
@@ -790,79 +782,42 @@ components:
               properties:
                 id:
                   type: string
-                  description: Server identifier for the FoI (REQUIRED for UPDATE/DEPRECATE)
-                sourceId:
-                  type: string
-                  nullable: true
-                  description: MUST be null or absent for UPDATE operations
+                  description: Server identifier for the FoI (REQUIRED for UPDATE, from previous CREATE response)
                 clientId:
                   type: string
                   nullable: true
-                  deprecated: true
-                  description: Deprecated - not used for UPDATE
-
-    UpsertFoiData:
-      title: Upsert FoI Data
-      type: object
-      description: Data for upserting a FoI (CREATE or UPDATE)
-      oneOf:
-        - $ref: '#/components/schemas/CreateFoiData'
-        - $ref: '#/components/schemas/UpdateFoiData'
-      discriminator:
-        propertyName: foi
-        mapping:
-          sourceId: '#/components/schemas/CreateFoiData'
-          id: '#/components/schemas/UpdateFoiData'
-
-    DeprecateFoiData:
-      title: Deprecate FoI Data
-      type: object
-      required:
-        - id
-        - reason
-      description: Data for deprecating a FoI
-      properties:
-        id:
-          type: string
-          description: Server ID (string) of the FoI to deprecate (MUST be server-generated)
-        reason:
-          type: string
-          minLength: 1
-          maxLength: 1000
-          description: The reason for deprecation
-        effectiveDate:
-          type: string
-          format: date-time
-          description: Date when the deprecation takes effect
+                  readOnly: true
+                  description: MUST be null or absent for UPDATE operations
 
     CreateParameterData:
       title: Create Parameter Data
       type: object
       required:
+        - clientId
         - parameter
-      description: Data for creating a new parameter (INSERT)
+      description: |
+        Data for creating a new parameter (INSERT)
+        
+        **Key Exchange:**
+        - `clientId`: REQUIRED - Client's identifier for the new parameter (any format)
+        - `parameter.id`: MUST be empty string "" for CREATE operations
       properties:
+        clientId:
+          type: string
+          description: Client's identifier for the new parameter (REQUIRED for CREATE, any format)
         parameter:
           allOf:
             - $ref: '#/components/schemas/DigitaleDelta.Parameter'
             - type: object
               required:
-                - sourceId
+                - id
                 - name
                 - definition
               properties:
-                sourceId:
-                  type: string
-                  description: Client's identifier for the new parameter (REQUIRED for CREATE)
                 id:
                   type: string
-                  nullable: true
-                  description: MUST be null or absent for CREATE operations
-                clientId:
-                  type: string
-                  nullable: true
-                  deprecated: true
-                  description: Deprecated - use sourceId instead
+                  enum: [""]
+                  description: MUST be empty string "" for CREATE operations
 
     UpdateParameterData:
       title: Update Parameter Data
@@ -882,29 +837,12 @@ components:
               properties:
                 id:
                   type: string
-                  description: Server identifier for the parameter (REQUIRED for UPDATE/DEPRECATE)
-                sourceId:
-                  type: string
-                  nullable: true
-                  description: MUST be null or absent for UPDATE operations
+                  description: Server identifier for the parameter (REQUIRED for UPDATE, from previous CREATE response)
                 clientId:
                   type: string
                   nullable: true
-                  deprecated: true
-                  description: Deprecated - not used for UPDATE
-
-    UpsertParameterData:
-      title: Upsert Parameter Data
-      type: object
-      description: Data for upserting a parameter (CREATE or UPDATE)
-      oneOf:
-        - $ref: '#/components/schemas/CreateParameterData'
-        - $ref: '#/components/schemas/UpdateParameterData'
-      discriminator:
-        propertyName: parameter
-        mapping:
-          sourceId: '#/components/schemas/CreateParameterData'
-          id: '#/components/schemas/UpdateParameterData'
+                  readOnly: true
+                  description: MUST be null or absent for UPDATE operations
 
     BatchOptions:
       title: Batch Options
@@ -947,7 +885,7 @@ components:
         
         When status is 'queued' or 'processing': only basic status fields are present.
         When status is 'completed' or 'failed': operations and errors fields are included.
-        The `operations` array contains both `sourceId` and `id` for traceability.
+        The `operations` array contains both `clientId` and `id` for traceability.
       properties:
         jobId:
           type: string
@@ -1016,12 +954,12 @@ components:
         De server genereert altijd zelf de server ID (als string) en retourneert deze.
         
         For **INSERT** operations (when a new entity is created):
-        - `sourceId`: The original client-provided sourceId (can be any format)
+        - `clientId`: The original client-provided clientId (can be any format)
         - `id`: The **server-generated identifier (string)**
         - Both IDs are returned so the client can maintain the mapping
         
-        For **UPDATE/DEPRECATE** operations:
-        - `sourceId`: Will be null (no sourceId in update/deprecate)
+        For **UPDATE/RETRACT** operations:
+        - `clientId`: Will be null (no clientId in update/retract)
         - `id`: The **server identifier (string)** that was used
       properties:
         operationIndex:
@@ -1035,12 +973,12 @@ components:
           type: string
           enum: [succeeded, failed, skipped]
           description: Status of this operation
-        sourceId:
+        clientId:
           type: string
           nullable: true
           description: |-
-            The original client sourceId (only for INSERT operations, can be any format).
-            Null for UPDATE/DEPRECATE operations.
+            The original client clientId (only for INSERT operations, can be any format).
+            Null for UPDATE/RETRACT operations.
         id:
           type: string
           nullable: true
@@ -1067,7 +1005,7 @@ components:
           type: string
           description: Error or warning code
           examples:
-            - "CLIENT_ID_IN_UPDATE"
+            - "CLIENTID_NOT_ALLOWED"
             - "ENTITY_NOT_FOUND"
             - "INVALID_CLIENT_ID"
             - "DUPLICATE_CLIENT_ID"
@@ -1116,8 +1054,9 @@ components:
         Defines an observation. The type of the observation defines how the results are expressed.
         
         **Key Exchange:**
-        - `id`: For CREATE: Client's own identifier (any format). For UPDATE: **server ID** (from previous response)
-        - `clientId`: Optional, must match `id` if provided. Only for CREATE.
+        - `id`: Server-generated identifier (string). For CREATE operations, must be empty string "".
+        - For CREATE: client uses `clientId` (at operation level), server returns server `id`
+        - For UPDATE/RETRACT: client uses server `id` (from previous response)
         - **De client mag NOOIT de server ID dicteren - de server genereert altijd zelf de identifier (string)**
       required:
         - id
@@ -1130,15 +1069,9 @@ components:
         id:
           type: string
           description: |
-            Unique ID of the observation.
-            - **For CREATE**: Client's own identifier (can be any format)
-            - **For UPDATE/DEPRECATE**: **server ID (string)** (from previous CREATE response)
-        clientId:
-          type: string
-          nullable: true
-          description: |
-            Optional client identifier (can be any format). If provided, MUST match the `id` field.
-            Only used for CREATE operations. **De server genereert altijd zelf de identifier (string)**.
+            Server-generated unique ID of the observation (string).
+            - **For CREATE**: Must be empty string ""
+            - **For UPDATE/RETRACT**: **server ID (string)** (from previous CREATE response)
         resultTime:
           type: string
           format: date-time
@@ -1205,8 +1138,9 @@ components:
         Feature of Interest as defined in the DD API V4 CSDL.
         
         **Key Exchange:**
-        - `id`: For CREATE: Client's own identifier (any format). For UPDATE: **server ID** (from previous response)
-        - `clientId`: Optional, must match `id` if provided. Only for CREATE.
+        - `id`: Server-generated identifier (string). For CREATE operations, must be empty string "".
+        - For CREATE: client uses `clientId` (at operation level), server returns server `id`
+        - For UPDATE: client uses server `id` (from previous response)
         - **De client mag NOOIT de server ID dicteren - de server genereert altijd zelf de identifier (string)**
       type: object
       required:
@@ -1217,15 +1151,9 @@ components:
         id:
           type: string
           description: |
-            Id of the Feature of Interest.
-            - **For CREATE**: Client's own identifier (can be any format)
-            - **For UPDATE/DEPRECATE**: **Server server-controlled string** (from previous CREATE response)
-        clientId:
-          type: string
-          nullable: true
-          description: |
-            Optional client identifier (can be any format). If provided, MUST match the `id` field.
-            Only used for CREATE operations. **De server genereert altijd zelf de identifier (string)**.
+            Server-generated unique ID of the Feature of Interest (string).
+            - **For CREATE**: Must be empty string ""
+            - **For UPDATE**: **Server server-controlled string** (from previous CREATE response)
         type:
           type: string
           nullable: true
@@ -1268,22 +1196,17 @@ components:
         A reference is an entity to which observations can refer.
         
         **Key Exchange:**
-        - `id`: For CREATE: Client's own identifier (any format). For UPDATE: **server ID** (from previous response)
-        - `clientId`: Optional, must match `id` if provided. Only for CREATE.
+        - `id`: Server-generated identifier (string). For CREATE operations, must be empty string "".
+        - For CREATE: client uses `clientId` (at operation level), server returns server `id`
+        - For UPDATE: client uses server `id` (from previous response)
         - **De client mag NOOIT de server ID dicteren - de server genereert altijd zelf de identifier (string)**
       properties:
         id:
           type: string
           description: |
-            Unique ID of the reference.
-            - **For CREATE**: Client's own identifier (can be any format)
+            Server-generated unique ID of the reference (string).
+            - **For CREATE**: Must be empty string ""
             - **For UPDATE**: **Server server-controlled string** (from previous CREATE response)
-        clientId:
-          type: string
-          nullable: true
-          description: |
-            Optional client identifier (can be any format). If provided, MUST match the `id` field.
-            Only used for CREATE operations. **De server genereert altijd zelf de identifier (string)**.
         type:
           type: string
           nullable: true
@@ -1586,7 +1509,7 @@ components:
             - "UNAUTHORIZED"
             - "FORBIDDEN"
             - "NOT_FOUND"
-            - "CLIENT_ID_IN_UPDATE"
+            - "CLIENTID_NOT_ALLOWED"
             - "INVALID_SERVER_ID"
         message:
           type: string
