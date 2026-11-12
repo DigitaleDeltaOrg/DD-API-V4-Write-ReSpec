@@ -9,7 +9,7 @@ Digitale Delta API V4 Write is een uitbreiding op de DD API V4 specificatie en b
 
 ## Kernprincipes
 
-1. **Per-entity batch-verwerking**: DD API V4 Write gebruikt afzonderlijke endpoints voor elke entiteitstype met eigen namespace voor batch-operaties en job tracking.
+1. **Per-entity batch-verwerking**: DD API V4 Write gebruikt afzonderlijke endpoints voor elke entiteittype met eigen namespace voor batch-operaties en job tracking.
 
 2. **Consistente job tracking**: Elke entiteit heeft zijn eigen job status endpoint onder dezelfde path:
    ```
@@ -39,7 +39,7 @@ Digitale Delta API V4 Write is een uitbreiding op de DD API V4 specificatie en b
 De Write module maakt het mogelijk om:
 - **Insert en update**: Observaties, meetobjecten (FoI) en parameters toe te voegen of bij te werken via entiteit-specifieke endpoints
 - **Retract/Terugtrekken**: Observaties en meetobjecten als vervallen te markeren
-- **Batch verwerking**: Meerdere operaties voor één entiteitstype in één request te versturen
+- **Batch verwerking**: Meerdere operaties voor één entiteittype in één request te versturen
 - **Asynchrone afhandeling**: Grote batches asynchroon te verwerken met per-entity status-tracking
 
 ## Relatie met DD API V4

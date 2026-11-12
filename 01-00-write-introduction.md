@@ -36,14 +36,14 @@ Dit ontwerp heeft verschillende voordelen:
 - **Eenvoudige validatie**: Server weet direct welk type job het is
 - **Betere organisatie**: Scheiding van verantwoordelijkheden per entiteit
 - **Efficiëntie**: Minder requests nodig (geen apart /results endpoint)
-- **Flexibiliteit**: Clients kunnen elk ID-formaat gebruiken voor hun eigen IDs
+- **Flexibiliteit**: Clients kunnen elk ID-formaat gebruiken voor hun eigen ID's
 
 ### Asynchrone Verwerking
 
 Batch-operaties zijn asynchroon. Dit betekent:
 
 1. Een batch-request wordt direct geaccepteerd en retourneert een job-ID
-2. De `Location` header wijst naar het job status endpoint (bijv. `/v4/write/observation/{jobId}`)
+2. De `Location` header wijst naar het job status endpoint (bijvoorbeeld `/v4/write/observation/{jobId}`)
 3. De daadwerkelijke verwerking gebeurt op de achtergrond
 4. De client kan de status opvragen via het endpoint in de `Location` header
 5. **Wanneer de job voltooid is**, retourneert hetzelfde endpoint de gedetailleerde resultaten
@@ -100,7 +100,7 @@ Een DD API V4 Write implementatie:
   - `GET /v4/write/observation/{jobId}`
   - `GET /v4/write/foi/{jobId}`
   - `GET /v4/write/parameter/{jobId}`
-- MOET **altijd zelf identifiers (als string) genereren** voor server-side keys (client mag NOOIT server ID dicteren)
+- MOET **altijd zelf identifiers (als string) genereren** voor server-side keys (client mag NOOIT server-ID dicteren)
 - MOET voor het `GET /{entity}/{jobId}` endpoint **alleen basisinformatie** retourneren wanneer status = `queued` of `processing` is, en **basis + gedetailleerde resultaten** wanneer status = `completed` of `failed` is
 - MOET de datamodellen conform DD API V4 gebruiken
 - MOET asynchrone verwerking ondersteunen

@@ -130,7 +130,7 @@ Verstuur een batch van **insert**, **update**, en **retract** operaties voor **o
 **Operaties**:
 - `insert`: Nieuwe observatie toevoegen (CREATE)
 - `update`: Bestaande observatie bijwerken (UPDATE)
-- `retract`: Observatie retracten
+- `retract`: Observatie terugtrekken
 
 **Key Exchange Regels**:
 - **INSERT**: `clientId` VEREIST (op operation niveau), `id` MOET "" zijn
@@ -175,9 +175,10 @@ Opvragen van de status en (als de job voltooid is) de resultaten van een observa
 #### Request
 
 **Parameters**:
-| Naam | Type | Verplicht | Beschrijving |
-|------|------|-----------|--------------|
-| jobId | string (uuid) | Ja | Unieke identifier van de observation job |
+
+| Naam  | Type          | Verplicht | Beschrijving                             |
+|-------|---------------|-----------|------------------------------------------|
+| jobId | string (uuid) | Ja        | Unieke identifier van de observation job |
 
 #### Response
 
@@ -224,10 +225,13 @@ Opvragen van de status en (als de job voltooid is) de resultaten van een observa
           "end": "2024-01-15T10:00:00Z"
         },
         "parameter": {
-          "parameter/waarnemingssoort": "WATHTE"
+          "quantity": "WATHTE",
+          "compartment": "OW"
         },
         "foi": {
-          "id": "550e8400-e29b-41d4-a716-446655440002"
+          "id": "550e8400-e29b-41d4-a716-446655440002",
+          "code": "location-code",
+          "geometry": {}
         },
         "result": {
           "id": "my-result-001",
@@ -255,10 +259,13 @@ Opvragen van de status en (als de job voltooid is) de resultaten van een observa
           "end": "2024-01-15T11:00:00Z"
         },
         "parameter": {
-          "parameter/waarnemingssoort": "WATHTE"
+          "quantity": "WATHTE",
+          "compartment": "OW"
         },
         "foi": {
-          "id": "550e8400-e29b-41d4-a716-446655440002"
+          "id": "550e8400-e29b-41d4-a716-446655440002",
+          "code": "location-code",
+          "geometry": {}
         },
         "result": {
           "id": "result-001",
@@ -309,38 +316,32 @@ Verstuur een batch van **insert** en **update** operaties voor **Features of Int
       "id": "op1",
       "clientId": "my-location-001",
       "data": {
-        "foi": {
-          "id": "",
-          "type": "http://definities.pdok.nl/def/cbsgb/1.0/id/datasetdefinitie/Top10NL",
-          "name": "Meetlocatie Amsterdam",
-          "organisation": "RWS",
-          "code": "LOC001",
-          "description": "Meetlocatie Amsterdam",
-          "location": "https://pdok.nl",
-          "geometry": {
-            "type": "Point",
-            "coordinates": [4.9, 52.37]
-          }
-        }
+       "id": "",
+       "name": "Meetlocatie Amsterdam",
+       "organisation": "RWS",
+       "code": "LOC001",
+       "description": "Meetlocatie Amsterdam",
+       "location": "https://pdok.nl",
+       "geometry": {
+         "type": "Point",
+         "coordinates": [4.9, 52.37]
+       }
       }
     },
     {
       "operation": "update",
       "id": "op2",
       "data": {
-        "foi": {
-          "id": "550e8400-e29b-41d4-a716-446655440002",
-          "type": "http://definities.pdok.nl/def/cbsgb/1.0/id/datasetdefinitie/Top10NL",
-          "name": "Meetlocatie Amsterdam Centraal",
-          "organisation": "RWS",
-          "code": "LOC001",
-          "description": "Meetlocatie Amsterdam Centraal Station",
-          "location": "https://pdok.nl",
-          "geometry": {
-            "type": "Point",
-            "coordinates": [4.9, 52.37]
-          }
-        }
+       "id": "550e8400-e29b-41d4-a716-446655440002",
+       "name": "Meetlocatie Amsterdam Centraal",
+       "organisation": "RWS",
+       "code": "LOC001",
+       "description": "Meetlocatie Amsterdam Centraal Station",
+       "location": "https://pdok.nl",
+       "geometry": {
+         "type": "Point",
+         "coordinates": [4.9, 52.37]
+       }
       }
     }
   ]
@@ -370,8 +371,6 @@ Opvragen van de status en resultaten van een FoI batch-job.
 
 Verstuur een batch van **insert** en **update** operaties voor **parameters**.
 
-**Belangrijk**: Parameters kunnen niet worden geretracteerd.
-
 #### Request
 
 **Content-Type**: `application/json`
@@ -385,22 +384,18 @@ Verstuur een batch van **insert** en **update** operaties voor **parameters**.
       "id": "op1",
       "clientId": "my-parameter-001",
       "data": {
-        "parameter": {
           "id": "",
           "name": "Waterhoogte",
-          "definition": "http://definities.pdok.nl/def/imkl/1.0/id/waarnemingssoort/WATHTE"
-        }
-      }
+          "definition": "https://definities.pdok.nl/def/imkl/1.0/id/waarnemingssoort/WATHTE"
+         }
     },
     {
       "operation": "update",
       "id": "op2",
       "data": {
-        "parameter": {
           "id": "550e8400-e29b-41d4-a716-446655440004",
           "name": "Waterhoogte (herzien)",
-          "definition": "http://definities.pdok.nl/def/imkl/1.0/id/waarnemingssoort/WATHTE"
-        }
+          "definition": "https://definities.pdok.nl/def/imkl/1.0/id/waarnemingssoort/WATHTE"
       }
     }
   ]
@@ -467,7 +462,7 @@ De implementatie MOET minimaal één van de volgende standaard methoden onderste
 - OAuth2 (client credentials flow)
 - mTLS (Mutual TLS certificaten)
 
-X-API-KEY is **NIET** toegestaan voor deze bewerkingen.
+Een `API-KEY` is **NIET** toegestaan voor deze bewerkingen.
 
 > **Noot**: De exacte authenticatiemethode(n) en configuratie zijn implementatie-specifiek, zolang deze voldoen aan de DD API V4 standaard.
 
@@ -496,7 +491,7 @@ Zie [Validatie](03-00-validation.md) voor een complete lijst van validatie foutc
 
 ### Key Exchange Fouten
 
-Zie [Key Exchange Mechanisme](06-00-key-exchange.md) voor key-exchange specifieke foutcodes.
+Zie [Key Exchange Mechanisme](05-00-key-exchange.md) voor key-exchange specifieke foutcodes.
 
 ## Samenvatting Endpoint Structuur
 

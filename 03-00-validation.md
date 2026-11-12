@@ -67,9 +67,9 @@ Controleert of de data voldoet aan de semantische regels van DD API V4.
 
 #### Parameter Validatie
 
-| Regel            | Foutcode               |
-|------------------|------------------------|
-| `name` verplicht | MISSING_PARAMETER_NAME |
+| Regel                  | Foutcode                     |
+|------------------------|------------------------------|
+| `name` verplicht       | MISSING_PARAMETER_NAME       |
 | `definition` verplicht | MISSING_PARAMETER_DEFINITION |
 
 ### 3. Contextuele Validatie
@@ -97,7 +97,7 @@ Controleert of de data voldoet aan de semantische regels van DD API V4.
 - `ID_NOT_ALLOWED`: id mag niet aanwezig zijn voor INSERT
 - `SOURCEID_NOT_ALLOWED`: clientId mag niet aanwezig zijn voor UPDATE/DEPRECATE
 - `ID_REQUIRED`: id is vereist voor UPDATE/DEPRECATE
-- `INVALID_SERVER_ID`: Ongeldige server ID
+- `INVALID_SERVER_ID`: Ongeldige server-ID
 - `ENTITY_NOT_FOUND`: Entiteit niet gevonden
 - `SOURCEID_IN_UPDATE`: clientId aanwezig in UPDATE/DEPRECATE
 
@@ -130,7 +130,7 @@ Validatie fouten worden geretourneerd in:
 ### Voorbeeld 1: clientId vereist voor INSERT (POST /v4/write/observation)
 
 **Request**:
-```json
+```jsonc
 {
   "operations": [{
     "operation": "insert",
@@ -169,7 +169,7 @@ Validatie fouten worden geretourneerd in:
 ### Voorbeeld 2: id niet toegestaan bij INSERT (POST /v4/write/observation)
 
 **Request**:
-```json
+```jsonc
 {
   "operations": [{
     "operation": "insert",
@@ -209,7 +209,7 @@ Validatie fouten worden geretourneerd in:
 ### Voorbeeld 3: clientId in UPDATE (POST /v4/write/observation)
 
 **Request**:
-```json
+```jsonc
 {
   "operations": [{
     "operation": "update",
@@ -249,7 +249,7 @@ Validatie fouten worden geretourneerd in:
 ### Voorbeeld 4: id vereist voor UPDATE (POST /v4/write/observation)
 
 **Request**:
-```json
+```jsonc
 {
   "operations": [{
     "operation": "update",
@@ -349,7 +349,7 @@ Validatie fouten worden geretourneerd in:
     "data": {
       "foi": {
         "clientId": "my-location-001",
-        "type": "http://definities.pdok.nl/def/cbsgb/1.0/id/datasetdefinitie/Top10NL",
+        "type": "https://definities.pdok.nl/def/cbsgb/1.0/id/datasetdefinitie/Top10NL",
         "name": "Meetlocatie",
         "organisation": "RWS",
         "code": "LOC001",
@@ -382,7 +382,7 @@ Validatie fouten worden geretourneerd in:
 ### Voorbeeld 7: Retract met clientId (POST /v4/write/observation)
 
 **Request**:
-```json
+```jsonc
 {
   "operations": [{
     "operation": "retract",
@@ -409,7 +409,7 @@ Validatie fouten worden geretourneerd in:
 ### Voorbeeld 8: Retract zonder id (POST /v4/write/observation)
 
 **Request**:
-```json
+```jsonc
 {
   "operations": [{
     "operation": "retract",
@@ -435,15 +435,15 @@ Validatie fouten worden geretourneerd in:
 
 Voor retract operaties worden de volgende validaties uitgevoerd:
 
-1. **Entiteit bestaat**: De entiteit met de opgegeven server ID moet bestaan
-2. **Server ID**: Het `id` veld moet een geldige server ID (string) zijn
+1. **Entiteit bestaat**: De entiteit met de opgegeven server-ID moet bestaan
+2. **Server ID**: Het `id` veld moet een geldige server-ID (string) zijn
 3. **Reden verplicht**: De `reason` moet aanwezig zijn en niet leeg
 4. **Effective date**: Als opgegeven, moet dit een geldige toekomstige datum zijn
 5. **clientId afwezig**: `clientId` MOET afwezig of null zijn
 
 **Foutcodes**:
-- `ENTITY_NOT_FOUND`: Entiteit met opgegeven server ID niet gevonden
-- `INVALID_SERVER_ID`: Ongeldige server ID formaat
+- `ENTITY_NOT_FOUND`: Entiteit met opgegeven server-ID niet gevonden
+- `INVALID_SERVER_ID`: Ongeldige server-ID formaat
 - `MISSING_REASON`: Reden voor retract is verplicht
 - `INVALID_EFFECTIVE_DATE`: Ongeldige effectiveDate
 - `SOURCEID_NOT_ALLOWED`: clientId mag niet aanwezig zijn
