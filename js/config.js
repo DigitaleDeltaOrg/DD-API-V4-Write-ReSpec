@@ -1,9 +1,9 @@
 // Minimale ReSpec configuratie met localBiblio
 var respecConfig = {
-    specStatus: "wv",        // Werkversie, kan ook "ED", "WD", etc.
+    specStatus: "cv",        // Werkversie, kan ook "ED", "WD", etc.
     shortName: "dd-api-v4",
     pubDomain: "api",
-    title: "Digitale Delta API v4 Specificatie",
+    title: "Digitale Delta API v4 Specificatie - Write module",
     nl_organisationName: "DigitaleDelta",
     latestVersion: ["nl_organisationPublishURL", "pubDomain", "/", "shortName", "/"],
     thisVersion: ["nl_organisationPublishURL", "pubDomain", "/", "specStatus", "-", "specType", "-", "shortName", "-", "publishDate"],
@@ -18,8 +18,14 @@ var respecConfig = {
     typeText: "DD API V4 specificatie",
     statusText: "Werkversie",
     language: "nl",
-    editors: [ { name: "Jeroen Gerrits", company: "Vortech", companyURL: "https://vortech.nl" } ],
-    authors: [ { name: "Geri Wolters", company: "EcoSys", companyURL: "https://ecosys.nl" } ],
+    editors: [ 
+        { name: "Yoerick Lankhof", company: "Informatiehuis Water", companyURL: "https://ihw.nl" },
+        { name: "Sela Tahanay", company: "Informatiehuis Water", companyURL: "https://ihw.nl" },
+        { name: "Dolf Daal", company: "Informatiehuis Water", companyURL: "https://ihw.nl" }
+    ],
+    authors: [ 
+        { name: "Geri Wolters", company: "EcoSys", companyURL: "https://ecosys.nl" }
+    ],
     logos: [
         {
             src: "https://digitaledeltaorg.github.io/DigitalDeltaLogoOptimized.svg",
@@ -120,9 +126,6 @@ var respecConfig = {
         "Aquo": { title: "Een initiatief van Nederlandse waterbeheerders dat gestandaardiseerde vocabularia biedt voor het waterdomein, beheerd door [Informatiehuis Water](#dnf-ihw), de Aquo standaard.", href: "https://aquo.nl" },
         "OM&S": { title: "Observations, Measurements & Samples, een standaard van het Open Geospatial Consortium (OGC) voor het modelleren en uitwisselen van observatiegegevens.", href: "https://www.ogc.org/standards/om/" },
         "OData": { title: "OData, Open Data Protocol, is een standaard voor het bouwen en consumeren van RESTful API`s die gegevens modelleert en -toegang biedt via webprotocollen zoals HTTP.", href: "https://www.odata.org" },
-        "EDM": { title: "Entity Data Model, een abstracte representatie van de data die wordt aangeboden via een API, beschreven in CSDL.", href: "https://www.odata.org" },
-        "CSDL": { title: "Een XML-gebaseerde taal voor het beschrijven van het Entity Data Model in OData.", href: "https://www.odata.org" },
-        "ANTLR": { title: "Abstract Syntax Tree Recognizer, een parser/tokenizer generator die grammatica's beschrijft in een specifieke taal.", href: "https://www.antlr.org" },
         "CRS": { title: "Coordinate Reference System, een systeem voor het definiëren van locaties op de aarde." },
         "ETRS89": { title: "European Terrestrial Reference System 1989, een geografisch coördinatenstelsel dat wordt gebruikt in Europa." },
         "EPSG": { title: "European Petroleum Survey Group, een organisatie die standaarden ontwikkelt voor geografische coördinatenstelsel en kaartprojecties. EPSG-codes worden gebruikt om een specifiek coördinatenstelsel te identificeren.", href: "https://epsg.org" },
@@ -137,8 +140,6 @@ var respecConfig = {
         "OGC": { title: "Open Geospatial Consortium, een internationale organisatie die standaarden ontwikkelt", href: "https://www.ogc.org" },
         "JSON": { title: "JavaScript Object Notation, een lichtgewicht data-uitwisselingsformaat dat gemakkelijk leesbaar is voor mensen en machines.", href: "https://json.org"  },
         "JSON Schema": { title: "Een vocabulaire voor het annoteren en valideren van de structuur van JSON-documenten.", href: "https://json.org" },
-        "Profiel": { title: "Een specifieke configuratie of subset van een standaard die is afgestemd op een bepaald gebruiksgebied of toepassing." },
-        "WebSub": { title: "Een webprotocol voor het publiceren en abonneren op berichten in real-time.", href: "https://www.w3.org/TR/websub/" }
     },
     plugins: {
         "core/data-include": {}
