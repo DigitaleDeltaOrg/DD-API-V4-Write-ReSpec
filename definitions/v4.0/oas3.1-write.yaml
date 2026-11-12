@@ -2,20 +2,47 @@ openapi: 3.1.0
 info:
   title: DD-API-V4 Write Module
   description: |
-    Digitale Delta API V4 Write Module - Batch verwerking voor het toevoegen/wijzigen/terugtrekken van data.
+    DD API V4 Write Module - Batch processing for adding/updating/retracting data.
+
+    This module adds write functionality to DD API V4. It provides a batch-based
+    method for adding, updating, and retracting observations, features of interest, and parameters.
     
-    Deze module voegt schrijf-functionaliteit toe aan DD API V4. Het biedt een batch-gebaseerde
-    methode voor het toevoegen, bijwerken en terugtrekken van observaties, meetobjecten en parameters.
+    ## Key Features
     
-    ## Belangrijke Kenmerken
+    - **Batch processing per entity**: Separate endpoints per entity type
+    - **Asynchronous execution**: Jobs are processed in the background
+    - **Custom wrapper**: Replaces OData wrapper with batch-specific structure
+    - **OAS 3.1**: Remains conformant to OpenAPI Specification 3.1
+    - **Key Exchange**: Server generates authoritative IDs and returns both client and server IDs
+    - **Per-entity job tracking**: Job status endpoints under each entity path
+    - **Single endpoint for status and results**: GET /write/{entity}/{jobId} returns status and (when completed) the results
     
-    - **Batch-verwerking per entiteit**: Afzonderlijke endpoints per entiteitstype
-    - **Asynchrone uitvoering**: Jobs worden op de achtergrond verwerkt
-    - **Eigen wrapper**: Vervangt OData-wrapper door batch-specifieke structuur
-    - **OAS 3.1**: Blijft conform OpenAPI Specification 3.1
-    - **Key Exchange**: Server genereert autoritatieve IDs en retourneert zowel client als server IDs
-    - **Per-entity job tracking**: Job status endpoints onder elke entiteit path
-    - **Single endpoint voor status en resultaten**: GET /write/{entity}/{jobId} retourneert status en (als completed) de resultaten
+    ## Key Exchange Mechanism
+    
+    The server always generates the server ID (as string) and returns it.
+    This prevents key conflicts between different providers and allows clients to use any desired ID format for their own identifiers.
+    
+    ### For INSERT operations (first time adding an entity):
+    - Client sends `clientId` (at operation level, can be any format as long as it is represented as a string)
+    - `entity.id` MUST be empty string ""
+    - **Server can generates its own server ID (string)**
+    - Response contains both `clientId` and `id`
+    
+    ### For UPDATE/RETRACT operations (follow-up operations):
+    - Client MUST use the **server ID (string)** in `entity.id`
+    - `clientId` MUST be absent
+    - Using clientId in update/retract results in error `CLIENTID_NOT_ALLOWED`
+    
+    ## Job Processing
+    When the job is still queued or processing, the response contains only status information.
+    When the job is completed (or failed), the response includes detailed operation results and any errors.
+    
+    The job status can be:
+    - `queued`: Job is waiting to be processed
+    - `processing`: Job is being processed
+    - `completed`: Job has finished (successfully or with errors) - includes operation results
+    - `failed`: Job failed before processing could start - includes error details
+  
   license:
     name: CC BY 4.0
     url: https://creativecommons.org/licenses/by/4.0/
@@ -45,6 +72,7 @@ tags:
 
 paths:
   /write/observation:
+    description: Batch write operations for observations
     post:
       tags:
         - Write
@@ -60,35 +88,17 @@ paths:
         When the job is still processing, the response contains only status information.
         When the job is completed, the response includes detailed operation results.
         
-        ## Key Exchange Mechanisme
-        
-        **De client mag NOOIT de server ID dicteren**
-        De server genereert altijd zelf de server ID (als string) en retourneert deze.
-        Dit voorkomt key-conflicten tussen verschillende aanbieders en staat clients toe 
-        om elk gewenst ID-formaat voor hun eigen identifiers te gebruiken.
-        
-        **Bij INSERT (eerste keer een observatie toevoegen):**
-        - Client stuurt `clientId` (op operation niveau, kan elk formaat zijn)
-        - `observation.id` MOET lege string "" zijn
-        - **Server genereert altijd zelf een server ID (string)**
-        - Response bevat zowel `clientId` als `id`
-        
-        **Bij UPDATE/RETRACT (vervolgoperaties):**
-        - Client MOET de **server ID (string)** gebruiken in `observation.id`
-        - `clientId` MOET afwezig zijn
-        - Gebruik van clientId in update/retract resulteert in fout `CLIENTID_NOT_ALLOWED`
-        
-        **Voor FoI referenties:**
-        - FoI referenties MOETEN **server IDs (string)** zijn (van eerdere create operaties)
+        See the [Key Exchange Mechanism](#key-exchange-mechanism) in the API description for ID handling rules.
       operationId: write.observation.submitBatch
       requestBody:
+        description: Batch of observation operations
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/ObservationBatchRequest'
             examples:
-              insertObservation:
+              batchExample:
                 summary: Insert new observation (CREATE)
                 description: |
                   INSERT operation: clientId REQUIRED at operation level, observation.id must be ""
@@ -96,7 +106,6 @@ paths:
                 value:
                   operations:
                     - operation: insert
-                      id: "op1"
                       clientId: "client-obs-001"
                       data:
                         observation:
@@ -107,23 +116,22 @@ paths:
                             begin: "2024-01-15T10:00:00Z"
                             end: "2024-01-15T10:00:00Z"
                           parameter:
-                            parameter/waarnemingssoort: "WATHTE"
+                            quantity: "WATHTE"
+                            compartment: "OW"
+                            organisation: "RWS"
                           foi:
                             id: "550e8400-e29b-41d4-a716-446655440002"
+                            code: "location-code"
+                            organisation: "RWS"
+                            description: "Description of the location."
+                            geometry: {}
                           result:
                             id: "result-001"
                             measure:
                               uom: "m"
                               value: 1.5
                           modifiedOn: "2024-01-15T10:00:00Z"
-              updateObservation:
-                summary: Update existing observation (UPDATE)
-                description: |
-                  UPDATE operation: observation.id (server) REQUIRED, clientId must be absent
-                value:
-                  operations:
                     - operation: update
-                      id: "op2"
                       data:
                         observation:
                           id: "550e8400-e29b-41d4-a716-446655440001"
@@ -133,26 +141,25 @@ paths:
                             begin: "2024-01-15T10:00:00Z"
                             end: "2024-01-15T10:00:00Z"
                           parameter:
-                            parameter/waarnemingssoort: "WATHTE"
+                            quantity: "WATHTE"
+                            compartment: "OW"
+                            organisation: "RWS"
                           foi:
                             id: "550e8400-e29b-41d4-a716-446655440002"
+                            code: "location-code"
+                            geometry: {}
+                            organisation: "RWS"
+                            description: "Description of the location."
                           result:
                             id: "result-001"
                             measure:
                               uom: "m"
                               value: 1.6
                           modifiedOn: "2024-01-15T10:00:00Z"
-              retractObservation:
-                summary: Retract observation
-                description: |
-                  RETRACT operation: observation.id (server) REQUIRED, clientId must be absent
-                value:
-                  operations:
                     - operation: retract
-                      id: "op3"
                       data:
                         id: "550e8400-e29b-41d4-a716-446655440001"
-                        reason: "Foutieve meting"
+                        reason: "Ongeldige meting"
                         modifiedOn: "2024-01-15T10:00:00Z"
       responses:
         '202':
@@ -163,10 +170,15 @@ paths:
               schema:
                 type: string
                 format: uri
+              example: "/api/v4.0/write/jobs/550e8400-e29b-41d4-a716-446655440001"
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/WriteJobStatus'
+              example:
+                jobId: "550e8400-e29b-41d4-a716-446655440001"
+                status: queued
+                
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -179,12 +191,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+              example:
+                code: "413"
+                message: Request entity too large
         '415':
           description: Unsupported media type
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+              example:
+                code: "415"
+                message: Unsupported media type
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -196,14 +214,7 @@ paths:
       description: |
         Retrieve the current status of an observation batch job.
         
-        When the job is still queued or processing, the response contains only status information.
-        When the job is completed (or failed), the response includes detailed operation results and any errors.
-        
-        The job status can be:
-        - `queued`: Job is waiting to be processed
-        - `processing`: Job is being processed
-        - `completed`: Job has finished (successfully or with errors) - includes operation results
-        - `failed`: Job failed before processing could start - includes error details
+        See the [Job processing](#job-processing) in the API description.
       operationId: write.observation.getJob
       parameters:
         - name: jobId
@@ -238,17 +249,10 @@ paths:
         **Job status and results can be retrieved from:**
         - GET /write/foi/{jobId}
         
-        ## Key Exchange Mechanisme
-        
-        **De client mag NOOIT de server ID dicteren**
-        De server genereert altijd zelf de server ID (als string) en retourneert deze.
-        
-        **Bij INSERT:** Client stuurt `clientId` (op operation niveau, kan elk formaat zijn), 
-        `foi.id` MOET lege string "" zijn, **server genereert altijd zelf een server ID (string)**, 
-        retourneert clientId + id
-        **Bij UPDATE:** Client MOET de **server ID (string)** gebruiken in `foi.id`, clientId MOET afwezig zijn
+        See the [Key Exchange Mechanism](#key-exchange-mechanism) in the API description for ID handling rules.
       operationId: write.foi.submitBatch
       requestBody:
+        description: Batch of FoI operations
         required: true
         content:
           application/json:
@@ -263,12 +267,10 @@ paths:
                 value:
                   operations:
                     - operation: insert
-                      id: "op1"
-                      clientId: "client-foi-001"
+                      clientId: "client-foi-001" 
                       data:
                         foi:
                           id: ""
-                          type: "http://definities.pdok.nl/def/cbsgb/1.0/id/datasetdefinitie/Top10NL"
                           name: "Meetlocatie Amsterdam"
                           organisation: "RWS"
                           code: "LOC001"
@@ -284,11 +286,9 @@ paths:
                 value:
                   operations:
                     - operation: update
-                      id: "op2"
                       data:
                         foi:
                           id: "550e8400-e29b-41d4-a716-446655440002"
-                          type: "http://definities.pdok.nl/def/cbsgb/1.0/id/datasetdefinitie/Top10NL"
                           name: "Meetlocatie Amsterdam Centraal"
                           organisation: "RWS"
                           code: "LOC001"
@@ -310,6 +310,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WriteJobStatus'
+              example:
+                jobId: "550e8400-e29b-41d4-a716-446655440001"
+                status: queued
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -322,6 +325,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+              example:
+                code: "413"
+                message: Request entity too large
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -331,10 +337,9 @@ paths:
         - FoI
       summary: Get FoI job status and results
       description: |
-        Retrieve the current status of a FoI batch job.
+        Retrieve the current status of an observation batch job.
         
-        When the job is still queued or processing, the response contains only status information.
-        When the job is completed (or failed), the response includes detailed operation results and any errors.
+        See the [Job processing](#job-processing) in the API description.
       operationId: write.foi.getJob
       parameters:
         - name: jobId
@@ -370,17 +375,10 @@ paths:
         **Job status and results can be retrieved from:**
         - GET /write/parameter/{jobId}
         
-        ## Key Exchange Mechanisme
-        
-        **De client mag NOOIT de server ID dicteren**
-        De server genereert altijd zelf de server ID (als string) en retourneert deze.
-        
-        **Bij INSERT:** Client stuurt `clientId` (op operation niveau, kan elk formaat zijn), 
-        `parameter.id` MOET lege string "" zijn, **server genereert altijd zelf een server ID (string)**, 
-        retourneert clientId + id
-        **Bij UPDATE:** Client MOET de **server ID (string)** gebruiken in `parameter.id`, clientId MOET afwezig zijn
+        See the [Key Exchange Mechanism](#key-exchange-mechanism) in the API description for ID handling rules.
       operationId: write.parameter.submitBatch
       requestBody:
+        description: Batch of parameter operations
         required: true
         content:
           application/json:
@@ -395,13 +393,13 @@ paths:
                 value:
                   operations:
                     - operation: insert
-                      id: "op1"
                       clientId: "client-param-001"
                       data:
                         parameter:
                           id: ""
-                          name: "Waterhoogte"
-                          definition: "http://definities.pdok.nl/def/imkl/1.0/id/waarnemingssoort/WATHTE"
+                          name: "WATHTE"
+                          definition: "https://definities.pdok.nl/def/imkl/1.0/id/waarnemingssoort/WATHTE"
+                          organisation: "RWS"
               updateParameter:
                 summary: Update existing parameter (UPDATE)
                 description: |
@@ -409,12 +407,12 @@ paths:
                 value:
                   operations:
                     - operation: update
-                      id: "op2"
                       data:
                         parameter:
                           id: "550e8400-e29b-41d4-a716-446655440004"
-                          name: "Waterhoogte (herzien)"
-                          definition: "http://definities.pdok.nl/def/imkl/1.0/id/waarnemingssoort/WATHTE"
+                          name: "WATHTE"
+                          definition: "https://definities.pdok.nl/def/imkl/1.0/id/waarnemingssoort/WATHTE"
+                          organisation: "RWS"
       responses:
         '202':
           description: Batch accepted for processing
@@ -428,6 +426,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WriteJobStatus'
+              example:
+                jobId: '423480'
+                status: queued
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -440,6 +441,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+              example:
+                code: "413"
+                message: Request entity too large
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -449,10 +453,9 @@ paths:
         - Parameter
       summary: Get parameter job status and results
       description: |
-        Retrieve the current status of a parameter batch job.
+        Retrieve the current status of an observation batch job.
         
-        When the job is still queued or processing, the response contains only status information.
-        When the job is completed (or failed), the response includes detailed operation results and any errors.
+        See the [Job processing](#job-processing) in the API description.
       operationId: write.parameter.getJob
       parameters:
         - name: jobId
@@ -531,117 +534,177 @@ components:
         options:
           $ref: '#/components/schemas/BatchOptions'
 
-    WriteOperationObservation:
-      title: Write Operation for Observation
+    InsertObservationOperation:
+      title: Insert Observation Operation
+      type: object
+      required:
+        - operation
+        - clientId
+        - data
+      description: Insert operation for observations
+      properties:
+        operation:
+          type: string
+          enum: [insert]
+          description: The type of operation
+        clientId:
+          type: string
+          description: Client identifier for the entity (REQUIRED for INSERT operations)
+        data:
+          $ref: '#/components/schemas/CreateObservationData'
+
+    UpdateObservationOperation:
+      title: Update Observation Operation
       type: object
       required:
         - operation
         - data
-      description: |
-        Operation for observation entity.
-        
-        **Key Exchange Rules:**
-        - INSERT: clientId REQUIRED (at operation level), observation.id must be ""
-        - UPDATE/RETRACT: observation.id REQUIRED (server ID), clientId must be absent
+      description: Update operation for observations
       properties:
         operation:
           type: string
-          enum: [insert, update, retract]
-          description: The type of operation to perform (insert, update or retract)
+          enum: [update]
+          description: The type of operation
+        data:
+          $ref: '#/components/schemas/UpdateObservationData'
+
+    RetractObservationOperation:
+      title: Retract Observation Operation
+      type: object
+      required:
+        - operation
+        - data
+      description: Retract operation for observations
+      properties:
+        operation:
+          type: string
+          enum: [retract]
+          description: The type of operation
+        data:
+          $ref: '#/components/schemas/RetractObservationData'
+
+    WriteOperationObservation:
+      title: Write Operation for Observation
+      type: object
+      description: |
+        Operation for observation entity.
+        
+        See the [Key Exchange Mechanism](#key-exchange-mechanism) for ID handling rules.
+      oneOf:
+        - $ref: '#/components/schemas/InsertObservationOperation'
+        - $ref: '#/components/schemas/UpdateObservationOperation'
+        - $ref: '#/components/schemas/RetractObservationOperation'
+      discriminator:
+        propertyName: operation
+        type: string
+        enum: [insert, update, retract]
+        mapping:
+          insert: '#/components/schemas/InsertObservationOperation'
+          update: '#/components/schemas/UpdateObservationOperation'
+          retract: '#/components/schemas/RetractObservationOperation'
+
+    InsertFoIOperation:
+      title: Insert FoI Operation
+      type: object
+      required:
+        - operation
+        - clientId
+        - data
+      description: Insert operation for FoI
+      properties:
+        operation:
+          type: string
+          enum: [insert]
+          description: The type of operation
         clientId:
           type: string
           description: Client identifier for the entity (REQUIRED for INSERT operations only)
         data:
-          type: object
-          description: The data for this operation
-          oneOf:
-            - $ref: '#/components/schemas/CreateObservationData'
-            - $ref: '#/components/schemas/UpdateObservationData'
-            - $ref: '#/components/schemas/RetractObservationData'
-          discriminator:
-            propertyName: operation
-            mapping:
-              insert: '#/components/schemas/CreateObservationData'
-              update: '#/components/schemas/UpdateObservationData'
-              retract: '#/components/schemas/RetractObservationData'
-        id:
+          $ref: '#/components/schemas/CreateFoiData'
+  
+    UpdateFoIOperation:
+      title: Update FoI Operation
+      type: object
+      required:
+        - operation
+        - data
+      description: Update operation for FoI
+      properties:
+        operation:
           type: string
-          maxLength: 100
-          description: Optional unique identifier for this operation within the batch
+          enum: [update]
+          description: The type of operation
+        data:
+          $ref: '#/components/schemas/UpdateFoiData'
 
     WriteOperationFoI:
       title: Write Operation for FoI
       type: object
-      required:
-        - operation
-        - data
       description: |
         Operation for FoI entity.
         
-        **Key Exchange Rules:**
-        - INSERT: clientId REQUIRED (at operation level), foi.id must be ""
-        - UPDATE: foi.id REQUIRED (server ID), clientId must be absent
+        See the [Key Exchange Mechanism](#key-exchange-mechanism) for ID handling rules.
+      oneOf:
+        - $ref: '#/components/schemas/InsertFoIOperation'
+        - $ref: '#/components/schemas/UpdateFoIOperation'
+      discriminator:
+        propertyName: operation
+        type: string
+        mapping:
+          insert: '#/components/schemas/InsertFoIOperation'
+          update: '#/components/schemas/UpdateFoIOperation'
+
+    InsertParameterOperation:
+      title: Insert Parameter Operation
+      type: object
+      required:
+        - operation
+        - clientId
+        - data
+      description: Insert operation for parameters
       properties:
         operation:
           type: string
-          enum: [insert, update]
-          description: The type of operation to perform (insert or update)
+          enum: [insert]
+          description: The type of operation
         clientId:
           type: string
           description: Client identifier for the entity (REQUIRED for INSERT operations only)
         data:
-          type: object
-          description: The data for this operation
-          oneOf:
-            - $ref: '#/components/schemas/CreateFoiData'
-            - $ref: '#/components/schemas/UpdateFoiData'
-          discriminator:
-            propertyName: operation
-            mapping:
-              insert: '#/components/schemas/CreateFoiData'
-              update: '#/components/schemas/UpdateFoiData'
-        id:
-          type: string
-          maxLength: 100
-          description: Optional unique identifier for this operation within the batch
+          $ref: '#/components/schemas/CreateParameterData'
 
-    WriteOperationParameter:
-      title: Write Operation for Parameter
+    UpdateParameterOperation:
+      title: Update Parameter Operation
       type: object
       required:
         - operation
         - data
-      description: |
-        Operation for parameter entity.
-        
-        **Key Exchange Rules:**
-        - INSERT: clientId REQUIRED (at operation level), parameter.id must be ""
-        - UPDATE: parameter.id REQUIRED (server ID), clientId must be absent
-        
-        Note: Parameters don't support retract operations.
+      description: Update operation for parameters
       properties:
         operation:
           type: string
-          enum: [insert, update]
-          description: The type of operation to perform (insert or update for parameters)
-        clientId:
-          type: string
-          description: Client identifier for the entity (REQUIRED for INSERT operations only)
+          enum: [update]
+          description: The type of operation
         data:
-          type: object
-          description: The data for this operation
-          oneOf:
-            - $ref: '#/components/schemas/CreateParameterData'
-            - $ref: '#/components/schemas/UpdateParameterData'
-          discriminator:
-            propertyName: operation
-            mapping:
-              insert: '#/components/schemas/CreateParameterData'
-              update: '#/components/schemas/UpdateParameterData'
-        id:
-          type: string
-          maxLength: 100
-          description: Optional unique identifier for this operation within the batch
+          $ref: '#/components/schemas/UpdateParameterData'
+
+    WriteOperationParameter:
+      title: Write Operation for Parameter
+      type: object
+      description: |
+        Operation for parameter entity.
+        
+        See the [Key Exchange Mechanism](#key-exchange-mechanism) for ID handling rules.
+        Note: Parameters don't support retract operations.
+      oneOf:
+        - $ref: '#/components/schemas/InsertParameterOperation'
+        - $ref: '#/components/schemas/UpdateParameterOperation'
+      discriminator:
+        propertyName: operation
+        type: string
+        mapping:
+          insert: '#/components/schemas/InsertParameterOperation'
+          update: '#/components/schemas/UpdateParameterOperation'
 
     CreateObservationData:
       title: Create Observation Data
@@ -649,29 +712,13 @@ components:
       required:
         - observation
       description: |
-        Data for creating a new observation (INSERT)
+        Data for creating a new observation (INSERT).
         
-        **Key Exchange:**
-        - `observation.id`: MUST be empty string "" for CREATE operations
-        - clientId is at operation level, not in data
+        See the [Key Exchange Mechanism](#key-exchange-mechanism) for ID handling rules.
       properties:
         observation:
-          allOf:
-            - $ref: '#/components/schemas/DigitaleDelta.Observation'
-            - type: object
-              required:
-                - id
-                - type
-                - resultTime
-                - phenomenonTime
-                - parameter
-                - modifiedOn
-              properties:
-                id:
-                  type: string
-                  enum: [""]
-                  description: MUST be empty string "" for CREATE operations
-
+          $ref: '#/components/schemas/DigitaleDelta.Observation'
+  
     UpdateObservationData:
       title: Update Observation Data
       type: object
@@ -680,69 +727,49 @@ components:
       description: Data for updating an existing observation (UPDATE)
       properties:
         observation:
-          allOf:
-            - $ref: '#/components/schemas/DigitaleDelta.Observation'
-            - type: object
-              required:
-                - id
-                - type
-                - resultTime
-                - phenomenonTime
-                - parameter
-                - modifiedOn
-              properties:
-                id:
-                  type: string
-                  description: Server identifier for the observation (REQUIRED for UPDATE/RETRACT, from previous CREATE response)
-
+          $ref: '#/components/schemas/DigitaleDelta.Observation'
+  
     RetractObservationData:
       title: Retract Observation Data
       type: object
       required:
         - id
         - reason
+        - modifiedOn
       description: Data for retracting an observation
       properties:
         id:
           type: string
           description: Server ID (string) of the observation to retract (MUST be server-generated, from previous CREATE response)
+          example: "<any string>"
         reason:
           type: string
           minLength: 1
           maxLength: 1000
           description: The reason for retraction
-        effectiveDate:
+          example: "device accuracy"
+        modifiedOn:
           type: string
           format: date-time
-          description: Date when the retraction takes effect
-
+          description: The date and time when the observation was retracted
+          example: "2024-01-15T10:00:00Z"
+      example:
+        id: "<any string>"
+        reason: "device accuracy"
+        modifiedOn: "2024-01-15T10:00:00Z"
+  
     CreateFoiData:
       title: Create FoI Data
       type: object
       required:
         - foi
       description: |
-        Data for creating a new FoI (INSERT)
+        Data for creating a new FoI (INSERT).
         
-        **Key Exchange:**
-        - `foi.id`: MUST be empty string "" for CREATE operations
-        - clientId is at operation level, not in data
+        See the [Key Exchange Mechanism](#key-exchange-mechanism) for ID handling rules.
       properties:
         foi:
-          allOf:
-            - $ref: '#/components/schemas/DigitaleDelta.Foi'
-            - type: object
-              required:
-                - id
-                - type
-                - name
-                - location
-                - geometry
-              properties:
-                id:
-                  type: string
-                  enum: [""]
-                  description: MUST be empty string "" for CREATE operations
+          $ref: '#/components/schemas/DigitaleDelta.Foi'
 
     UpdateFoiData:
       title: Update FoI Data
@@ -752,19 +779,7 @@ components:
       description: Data for updating an existing FoI (UPDATE)
       properties:
         foi:
-          allOf:
-            - $ref: '#/components/schemas/DigitaleDelta.Foi'
-            - type: object
-              required:
-                - id
-                - type
-                - name
-                - location
-                - geometry
-              properties:
-                id:
-                  type: string
-                  description: Server identifier for the FoI (REQUIRED for UPDATE, from previous CREATE response)
+          $ref: '#/components/schemas/DigitaleDelta.Foi'
 
     CreateParameterData:
       title: Create Parameter Data
@@ -772,11 +787,9 @@ components:
       required:
         - parameter
       description: |
-        Data for creating a new parameter (INSERT)
+        Data for creating a new parameter (INSERT).
         
-        **Key Exchange:**
-        - `parameter.id`: MUST be empty string "" for CREATE operations
-        - clientId is at operation level, not in data
+        See the [Key Exchange Mechanism](#key-exchange-mechanism) for ID handling rules.
       properties:
         parameter:
           allOf:
@@ -786,11 +799,6 @@ components:
                 - id
                 - name
                 - definition
-              properties:
-                id:
-                  type: string
-                  enum: [""]
-                  description: MUST be empty string "" for CREATE operations
 
     UpdateParameterData:
       title: Update Parameter Data
@@ -803,14 +811,6 @@ components:
           allOf:
             - $ref: '#/components/schemas/DigitaleDelta.Parameter'
             - type: object
-              required:
-                - id
-                - name
-                - definition
-              properties:
-                id:
-                  type: string
-                  description: Server identifier for the parameter (REQUIRED for UPDATE, from previous CREATE response)
 
     BatchOptions:
       title: Batch Options
@@ -843,63 +843,28 @@ components:
       required:
         - jobId
         - status
-        - createdAt
-        - totalOperations
       description: |
         Status and results of a batch job.
-        
-        **De client mag NOOIT de server ID dicteren**
-        De server genereert altijd zelf de server ID (als string) en retourneert deze.
         
         When status is 'queued' or 'processing': only basic status fields are present.
         When status is 'completed' or 'failed': operations and errors fields are included.
         The `operations` array contains action, clientId (for inserts) and the complete entity data.
+        See the [Key Exchange Mechanism](#key-exchange-mechanism) for ID handling details.
       properties:
         jobId:
           type: string
-          
           description: Unique identifier for this job
         status:
           type: string
           enum: [queued, processing, completed, failed]
           description: Current status of the job
-        createdAt:
-          type: string
-          format: date-time
-          description: Timestamp when the job was created
-        startedAt:
-          type: string
-          format: date-time
-          nullable: true
-          description: Timestamp when processing started
-        completedAt:
-          type: string
-          format: date-time
-          nullable: true
-          description: Timestamp when processing completed
-        totalOperations:
-          type: integer
-          minimum: 0
-          description: Total number of operations in the batch
-        successfulOperations:
-          type: integer
-          minimum: 0
-          nullable: true
-          description: Number of successfully processed operations (only present when status is completed or failed)
-        failedOperations:
-          type: integer
-          minimum: 0
-          nullable: true
-          description: Number of failed operations (only present when status is completed or failed)
         operations:
           type: array
-          nullable: true
           description: Status of individual operations (only present when status is completed or failed)
           items:
             $ref: '#/components/schemas/OperationResult'
         errors:
           type: array
-          nullable: true
           description: General errors at batch level (only present when status is completed or failed)
           items:
             $ref: '#/components/schemas/BatchError'
@@ -907,26 +872,26 @@ components:
           type: string
           format: uri
           description: URL to check the status of this job
+      example:
+        jobId: '423480'
+        status: queued
 
     OperationResult:
       title: Operation Result
       type: object
       required:
-        - operationIndex
         - operationId
         - action
         - status
       description: |
         Result of an individual operation within a batch.
         
-        **De client mag NOOIT de server ID dicteren**
-        De server genereert altijd zelf de server ID (als string) en retourneert deze.
-        
         Contains:
         - `action`: The requested action (insert/update/retract)
         - `clientId`: The client-provided clientId (only for INSERT operations)
         - `data`: The complete entity data (with server-generated IDs for INSERT)
         - `status`: Status of the operation
+        See the [Key Exchange Mechanism](#key-exchange-mechanism) for ID handling details.
       properties:
         operationIndex:
           type: integer
@@ -941,7 +906,6 @@ components:
           description: The action that was requested
         clientId:
           type: string
-          nullable: true
           description: The client-provided identifier (only for INSERT operations, null for UPDATE/RETRACT)
         status:
           type: string
@@ -949,7 +913,6 @@ components:
           description: Status of this operation
         data:
           type: object
-          nullable: true
           description: The complete entity data (with server-generated IDs)
           oneOf:
             - $ref: '#/components/schemas/DigitaleDelta.Observation'
@@ -1014,18 +977,71 @@ components:
     # ========================================================================
     # DD API V4 Core Schemas with Key Exchange Support
     # ========================================================================
+    DigitaleDelta.Parameter:
+      title: Parameter
+      type: object
+      description: A parameter is an entity to which observations can refer.
+      required:
+        - id
+        - type
+        - organisation
+        - code
+      properties:
+        id:
+          type: string
+          description: Unique ID of the parameter.
+        type:
+          type: string
+          description: Type of the parameter
+        organisation:
+          type: string
+          description: Organisation responsible for the reference
+        code:
+          type: string
+          description: Code of the parameter
+        description:
+          type: string
+          description: Short description of the parameter
+        details:
+          $ref: "#/components/schemas/DigitaleDelta.ParameterDetailsContainer"
+  
+    DigitaleDelta.Foi:
+      title: Feature of Interest
+      description: Feature of Interest as defined in the DD API V4 CSDL.
+      type: object
+      required:
+        - id
+        - code
+        - description
+        - geometry
+        - organisation
+      properties:
+        id:
+          type: string
+          description: Id of the Feature of Interest.
+        type:
+          type: string
+          description: Type of the Feature of Interest.
+        organisation:
+          type: string
+          description: Organisation responsible for the Feature of Interest.
+        code:
+          type: string
+          description: Code of the Feature of Interest.
+        geometry:
+          $ref: '#/components/schemas/Edm.Geometry'
+        description:
+          type: string
+          description: Description of the Feature of Interest.
+        identities:
+          $ref: '#/components/schemas/DigitaleDelta.FoiIdentityContainer'
+        classifications:
+          $ref: '#/components/schemas/DigitaleDelta.FoiClassificationContainer'
 
     DigitaleDelta.Observation:
       title: Observation
       type: object
-      description: |
-        Defines an observation. The type of the observation defines how the results are expressed.
-        
-        **Key Exchange:**
-        - `id`: Server-generated identifier (string). For CREATE operations, must be empty string "".
-        - For CREATE: client uses `clientId` (at operation level), server returns server `id`
-        - For UPDATE/RETRACT: client uses server `id` (from previous response)
-        - **De client mag NOOIT de server ID dicteren - de server genereert altijd zelf de identifier (string)**
+      description: Defines an observation. The type of the observation defines how the results are expressed.
       required:
         - id
         - type
@@ -1036,44 +1052,34 @@ components:
       properties:
         id:
           type: string
-          description: |
-            Server-generated unique ID of the observation (string).
-            - **For CREATE**: Must be empty string ""
-            - **For UPDATE/RETRACT**: **server ID (string)** (from previous CREATE response)
+          description: Unique ID of the observation.
+          example: <any string>
+        type:
+          type: string
+          enum: [count, truth, measure, category, coverageJSON]
+          description: Type of the observation.
         resultTime:
           type: string
           format: date-time
         phenomenonTime:
           $ref: '#/components/schemas/DigitaleDelta.TmPeriod_Closed'
         validTime:
-          anyOf:
-            - $ref: '#/components/schemas/DigitaleDelta.TmPeriod_OpenEnd'
-            - type: object
-              nullable: true
+          $ref: '#/components/schemas/DigitaleDelta.TmPeriod_OpenEnd'
         parameter:
           $ref: '#/components/schemas/DigitaleDelta.ParameterContainer'
         metadata:
-          anyOf:
-            - $ref: '#/components/schemas/DigitaleDelta.MetadataContainer'
-            - type: object
-              nullable: true
+          $ref: '#/components/schemas/DigitaleDelta.MetadataContainer'
         foi:
-          anyOf:
-            - $ref: '#/components/schemas/DigitaleDelta.Foi'
-            - type: object
-              nullable: true
-          description: Feature of Interest (reference by server ID)
+          $ref: '#/components/schemas/DigitaleDelta.Foi'
         result:
-          anyOf:
-            - $ref: '#/components/schemas/DigitaleDelta.Result'
-            - type: object
-              nullable: true
+          $ref: '#/components/schemas/DigitaleDelta.Result' 
         modifiedOn:
           type: string
           format: date-time
-
+    
     DigitaleDelta.TmPeriod_OpenEnd:
       title: TmPeriod_OpenEnd
+      description: Defines a period with a begin date and an open end.
       type: object
       required:
         - begin
@@ -1084,10 +1090,10 @@ components:
         end:
           type: string
           format: date-time
-          nullable: true
-
+    
     DigitaleDelta.TmPeriod_Closed:
       title: TmPeriod_Closed
+      description: Defines a period with a begin and end date.
       type: object
       required:
         - begin
@@ -1099,173 +1105,227 @@ components:
         end:
           type: string
           format: date-time
-
-    DigitaleDelta.Foi:
-      title: Feature of Interest
-      description: |
-        Feature of Interest as defined in the DD API V4 CSDL.
-        
-        **Key Exchange:**
-        - `id`: Server-generated identifier (string). For CREATE operations, must be empty string "".
-        - For CREATE: client uses `clientId` (at operation level), server returns server `id`
-        - For UPDATE: client uses server `id` (from previous response)
-        - **De client mag NOOIT de server ID dicteren - de server genereert altijd zelf de identifier (string)**
-      type: object
-      required:
-        - id
-        - code
-        - description
-      properties:
-        id:
-          type: string
-          description: |
-            Server-generated unique ID of the Feature of Interest (string).
-            - **For CREATE**: Must be empty string ""
-            - **For UPDATE**: **Server server-controlled string** (from previous CREATE response)
-        type:
-          type: string
-          nullable: true
-          description: Type of the Feature of Interest.
-        organisation:
-          type: string
-          nullable: true
-          description: Organisation responsible for the Feature of Interest.
-        code:
-          type: string
-          description: Code of the Feature of Interest.
-        geometry:
-          anyOf:
-            - $ref: '#/components/schemas/Edm.Geometry'
-            - type: object
-              nullable: true
-        description:
-          type: string
-          description: Description of the Feature of Interest.
-        identities:
-          anyOf:
-            - $ref: '#/components/schemas/DigitaleDelta.FoiIdentityContainer'
-            - type: object
-              nullable: true
-        classifications:
-          anyOf:
-            - $ref: '#/components/schemas/DigitaleDelta.FoiClassificationContainer'
-            - type: object
-              nullable: true
-        networks:
-          type: array
-          items:
-            type: string
-          nullable: true
-
-    DigitaleDelta.Parameter:
-      title: Parameter
-      type: object
-      description: |
-        A reference is an entity to which observations can refer.
-        
-        **Key Exchange:**
-        - `id`: Server-generated identifier (string). For CREATE operations, must be empty string "".
-        - For CREATE: client uses `clientId` (at operation level), server returns server `id`
-        - For UPDATE: client uses server `id` (from previous response)
-        - **De client mag NOOIT de server ID dicteren - de server genereert altijd zelf de identifier (string)**
-      properties:
-        id:
-          type: string
-          description: |
-            Server-generated unique ID of the reference (string).
-            - **For CREATE**: Must be empty string ""
-            - **For UPDATE**: **Server server-controlled string** (from previous CREATE response)
-        type:
-          type: string
-          nullable: true
-          description: Type of the reference
-        organisation:
-          type: string
-          nullable: true
-          description: Organisation responsible for the reference
-        code:
-          type: string
-          description: Code of the reference
-        description:
-          type: string
-          description: Short description of the reference
-        details:
-          $ref: "#/components/schemas/DigitaleDelta.ParameterDetailsContainer"
-
+      
     DigitaleDelta.ParameterContainer:
       title: ParameterContainer
       type: object
-      description: Defines the quantifiable references related to the observation
+      description: Defines the quantifiable references related to the observation. Can be expanded with V4 SemanticPropertyBag from group 'parameter' for required domain/version.
       additionalProperties: true
-
+      # {SemanticPropertyBag("parameter")}
+    
     DigitaleDelta.ParameterDetailsContainer:
       title: ParameterDetailsContainer
       type: object
-      description: Defines the quantifiable references known to the system
+      description: Defines the quantifiable references known to the system. Can be expanded with V4 SemanticPropertyBag from group 'parameterDetails' for required domain/version.
       additionalProperties: true
-
+      # {SemanticPropertyBag("parameterDetails")}
+    
     DigitaleDelta.FoiIdentityContainer:
       title: FoiIdentityContainer
       type: object
-      description: Defines alternate identities for FoI.
+      description: Defines alternate identities for FoI Can be expanded with V4 SemanticPropertyBag from group 'foiIdentitiesForObservation' for required domain/version.
       additionalProperties: true
-
+      # {SemanticPropertyBag("foiIdentitiesForObservation")}
+    
     DigitaleDelta.FoiClassificationContainer:
       title: FoiClassificationContainer
       type: object
-      description: Defines classifications for FoI.
+      description: Defines classifications for FoI. Can be expanded with V4 SemanticPropertyBag from group 'foiClassificationsForObservation' for required domain/version.
       additionalProperties: true
+      # {SemanticPropertyBag("foiClassificationsForObservation")}
 
     DigitaleDelta.MetadataContainer:
       title: MetadataContainer
       type: object
-      description: Non-quantifiable data
+      description: Non-quantifiable data. Can be expanded with V4 SemanticPropertyBag from group 'metadata' for required domain/version.
       additionalProperties: true
+      # {SemanticPropertyBag("metadata")}
 
     DigitaleDelta.Result:
       title: Result
       type: object
+      description: Result of an observation. Result is polymorphic.
       required:
         - id
       properties:
         id:
           type: string
           description: Unique ID of the result.
-        truth:
-          type: boolean
-          nullable: true
-          description: Truth observation. Can only result in true or false.
-        count:
+      oneOf:
+        - required: [ truth ]
+          properties:
+            truth:
+              type: boolean
+              description: Truth observation. Can only result in true or false.
+        - required: [ count ]
+          properties:
+            count:
+              type: integer
+              format: int64
+              description: Count observation. No unit specified and the value can only be an integer value.
+        - required: [measure]
+          properties:
+            measure:
+              $ref: '#/components/schemas/DigitaleDelta.Measure'
+        - required: [category]
+          properties:
+            category:
+              $ref: '#/components/schemas/DigitaleDelta.Category'
+        - required: [coverageJSON]
+          properties:
+            coverageJSON:
+              $ref: '#/components/schemas/DigitaleDelta.CoverageJSON'
+        - required: [retracted]
+          properties:
+            retracted:
+              $ref: '#/components/schemas/DigitaleDelta.Retracted'
+    
+    
+    DigitaleDelta.CoverageJSON:
+      title: CoverageJSON
+      description: CoverageJSON format object used for time series, ensembles, coverages and other data.
+      type: object
+      properties:
+        type:
+          type: string
+        domain:
+          $ref: '#/components/schemas/DigitaleDelta.CoverageDomain'
+        parameters:
+          $ref: '#/components/schemas/DigitaleDelta.CoverageParameterContainer'
+        ranges:
+          $ref: '#/components/schemas/DigitaleDelta.CoverageRangeContainer'
+        nodata:
+          type: string
+        profile:
+          type: string
+
+    DigitaleDelta.CoverageDomain:
+      title: CoverageDomain
+      description: CoverageDomain object used for time series, ensembles, coverages and other data.
+      type: object
+      properties:
+        type:
+          type: string
+        axes:
+          $ref: '#/components/schemas/DigitaleDelta.CoverageAxes'
+        referencing:
+          type: array
+          items:
+            $ref: '#/components/schemas/DigitaleDelta.CoverageReferencing'
+        CRS:
+          type: string
+
+    DigitaleDelta.CoverageAxes:
+      title: CoverageAxes
+      type: object
+      description: CoverageAxes object used for time series, ensembles, coverages and other data.
+      additionalProperties:
+        $ref: '#/components/schemas/DigitaleDelta.CoverageAxis'
+      properties:
+        x:
+          $ref: '#/components/schemas/DigitaleDelta.CoverageAxis'
+
+    DigitaleDelta.CoverageAxis:
+      title: CoverageAxis
+      type: object
+      description: CoverageAxis object used for time series, ensembles, coverages and other data.
+      properties:
+        type:
+          type: string
+        values:
+          type: array
+          items:
+            type: number
+            format: double
+        start:
+          type: number
+          format: double
+        size:
           type: integer
           format: int64
-          nullable: true
-          description: Count observation. No unit specified and the value can only be an integer value.
-        measure:
-          anyOf:
-            - $ref: '#/components/schemas/DigitaleDelta.Measure'
-            - type: object
-              nullable: true
-          description: Result is expressed in a unit and a value.
-        category:
-          anyOf:
-            - $ref: '#/components/schemas/DigitaleDelta.Category'
-            - type: object
-              nullable: true
-          description: Result is expressed as a category.
-        coverageJSON:
-          anyOf:
-            - type: object
-              nullable: true
-          description: Result is expressed as CoverageJSON.
-        retracted:
-          anyOf:
-            - $ref: '#/components/schemas/DigitaleDelta.Retracted'
-            - type: object
-              nullable: true
+        offset:
+          type: number
+          format: double
+        spacing:
+          type: number
+          format: double
+        keys:
+          type: array
+          items:
+            type: string
 
+    DigitaleDelta.CoverageReferencing:
+      title: CoverageReferencing
+      type: object
+      description: CoverageReferencing object used for time series, ensembles, coverages and other data.
+      properties:
+        coordinates:
+          type: string
+        system:
+          type: string
+        datum:
+          type: string
+
+    DigitaleDelta.CoverageParameterContainer:
+      title: CoverageParameterContainer
+      type: object
+      description: CoverageParameterContainer object used for time series, ensembles, coverages and other data.
+      additionalProperties:
+        $ref: '#/components/schemas/DigitaleDelta.CoverageParameterDefinition'
+
+    DigitaleDelta.CoverageParameterDefinition:
+      title: CoverageParameterDefinition
+      type: object
+      description: CoverageParameterDefinition object used for time series, ensembles, coverages and other data.
+      properties:
+        type:
+          type: string
+        units:
+          type: string
+        observedProperty:
+          type: string
+        description:
+          type: string
+        flags:
+          type: string
+
+    DigitaleDelta.CoverageRangeContainer:
+      title: CoverageRangeContainer
+      description: CoverageRangeContainer object used for time series, ensembles, coverages and other data.
+      type: object
+      additionalProperties:
+        $ref: '#/components/schemas/DigitaleDelta.CoverageRangeDefinition'
+
+    DigitaleDelta.CoverageRangeDefinition:
+      title: CoverageRangeDefinition
+      description: CoverageRangeDefinition object used for time series, ensembles, coverages and other data.
+      type: object
+      properties:
+        type:
+          type: string
+        dataType:
+          type: string
+        axisNames:
+          type: array
+          items:
+            type: string
+        shape:
+          type: array
+          items:
+            type: integer
+            format: int64
+        values:
+          type: array
+          items:
+            type: number
+            format: double
+        encoding:
+          type: string
+        
     DigitaleDelta.Measure:
       title: Measure
       type: object
+      description: Result is expressed in a unit and a value.
       required:
         - uom
         - value
@@ -1281,16 +1341,15 @@ components:
           description: Measured value.
         namespace:
           type: string
-          nullable: true
           description: Namespace of the unit of the measured value.
         limitSymbol:
           type: string
-          nullable: true
           description: Limit symbol of the measured value.
-
+    
     DigitaleDelta.Category:
       title: Category
       type: object
+      description: Result is expressed as a category.
       required:
         - nameSpace
         - code
@@ -1301,17 +1360,19 @@ components:
         code:
           type: string
           description: Term within the vocabulary.
-
+    
     DigitaleDelta.Retracted:
       title: Retracted
+      description: Result is retracted.
       type: object
       required:
         - reason
       properties:
         reason:
           type: string
-
+    
     Edm.Geometry:
+      description: Defines a geometry in a coordinate system.
       oneOf:
         - $ref: '#/components/schemas/Edm.GeometryPoint'
         - $ref: '#/components/schemas/Edm.GeometryLineString'
@@ -1325,125 +1386,114 @@ components:
 
     Edm.GeometryPoint:
       type: object
-      required:
-        - type
-        - coordinates
+      description: Defines a point in a coordinate system.
       properties:
         type:
           type: string
-          enum: [Point]
+          enum:
+            - Point
         coordinates:
           type: array
-          minItems: 2
           items:
             type: number
-            format: double
+          minItems: 2
+          maxItems: 2
 
     Edm.GeometryLineString:
       type: object
-      required:
-        - type
-        - coordinates
+      description: Defines a line in a coordinate system.
       properties:
         type:
           type: string
-          enum: [LineString]
+          enum:
+            - LineString
         coordinates:
           type: array
-          minItems: 2
           items:
             type: array
-            minItems: 2
             items:
               type: number
-              format: double
+            minItems: 2
+          minItems: 2
 
     Edm.GeometryPolygon:
       type: object
-      required:
-        - type
-        - coordinates
+      description: Defines a polygon in a coordinate system.
       properties:
         type:
           type: string
-          enum: [Polygon]
+          enum:
+            - Polygon
         coordinates:
           type: array
-          minItems: 1
           items:
             type: array
-            minItems: 4
             items:
               type: array
-              minItems: 2
               items:
                 type: number
-                format: double
+              minItems: 2
+            minItems: 4
 
     Edm.GeometryMultiPoint:
       type: object
-      required:
-        - type
-        - coordinates
+      description: Defines a collection of points in a coordinate system.
       properties:
         type:
           type: string
-          enum: [MultiPoint]
+          enum:
+            - MultiPoint
         coordinates:
           type: array
           items:
             type: array
-            minItems: 2
             items:
               type: number
-              format: double
+            minItems: 2
 
     Edm.GeometryMultiLineString:
       type: object
-      required:
-        - type
-        - coordinates
+      description: Defines a collection of lines in a coordinate system.
       properties:
         type:
           type: string
-          enum: [MultiLineString]
+          enum:
+            - MultiLineString
         coordinates:
           type: array
           items:
             type: array
-            minItems: 2
             items:
               type: array
-              minItems: 2
               items:
                 type: number
-                format: double
+              minItems: 2
+            minItems: 2
 
     Edm.GeometryMultiPolygon:
       type: object
-      required:
-        - type
-        - coordinates
+      description: Defines a collection of polygons in a coordinate system.
       properties:
         type:
           type: string
-          enum: [MultiPolygon]
+          enum:
+            - MultiPolygon
         coordinates:
           type: array
           items:
             type: array
             items:
               type: array
-              minItems: 4
               items:
                 type: array
-                minItems: 2
                 items:
                   type: number
-                  format: double
+                minItems: 2
+              minItems: 4
 
     Edm.GeometryCollection:
       type: object
+      description: Defines a collection of geometries in a coordinate system.
       required:
         - type
         - geometries
@@ -1463,8 +1513,8 @@ components:
               - $ref: '#/components/schemas/Edm.GeometryMultiPolygon'
 
     Error:
-      title: Error
       type: object
+      description: Represents an error response.
       required:
         - code
         - message
@@ -1564,12 +1614,15 @@ components:
       flows:
         clientCredentials:
           tokenUrl: https://auth.example.com/oauth2/token
+          scopes:
+            read: Read access
+            write: Write access
 
     mTLS:
       type: mutualTLS
       description: Mutual TLS authentication (DD API V4 standard)
 
-  security:
-    - bearerAuth: []
-    - oauth2: []
-    - mTLS: []
+security:
+  - bearerAuth: []
+  - oauth2: []
+  - mTLS: []
