@@ -97,70 +97,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/ObservationBatchRequest'
-            examples:
-              batchExample:
-                summary: Insert new observation (CREATE)
-                description: |
-                  INSERT operation: clientId REQUIRED at operation level, observation.id must be ""
-                  Server will return both server id and clientId in response
-                value:
-                  operations:
-                    - operation: insert
-                      clientId: "client-obs-001"
-                      data:
-                        observation:
-                          id: ""
-                          type: "measure"
-                          resultTime: "2024-01-15T10:00:00Z"
-                          phenomenonTime:
-                            begin: "2024-01-15T10:00:00Z"
-                            end: "2024-01-15T10:00:00Z"
-                          parameter:
-                            quantity: "WATHTE"
-                            compartment: "OW"
-                            organisation: "RWS"
-                          foi:
-                            id: "550e8400-e29b-41d4-a716-446655440002"
-                            code: "location-code"
-                            organisation: "RWS"
-                            description: "Description of the location."
-                            geometry: {}
-                          result:
-                            id: "result-001"
-                            measure:
-                              uom: "m"
-                              value: 1.5
-                          modifiedOn: "2024-01-15T10:00:00Z"
-                    - operation: update
-                      data:
-                        observation:
-                          id: "550e8400-e29b-41d4-a716-446655440001"
-                          type: "measure"
-                          resultTime: "2024-01-15T10:00:00Z"
-                          phenomenonTime:
-                            begin: "2024-01-15T10:00:00Z"
-                            end: "2024-01-15T10:00:00Z"
-                          parameter:
-                            quantity: "WATHTE"
-                            compartment: "OW"
-                            organisation: "RWS"
-                          foi:
-                            id: "550e8400-e29b-41d4-a716-446655440002"
-                            code: "location-code"
-                            geometry: {}
-                            organisation: "RWS"
-                            description: "Description of the location."
-                          result:
-                            id: "result-001"
-                            measure:
-                              uom: "m"
-                              value: 1.6
-                          modifiedOn: "2024-01-15T10:00:00Z"
-                    - operation: retract
-                      data:
-                        id: "550e8400-e29b-41d4-a716-446655440001"
-                        reason: "Ongeldige meting"
-                        modifiedOn: "2024-01-15T10:00:00Z"
       responses:
         '202':
           description: Batch accepted for processing
@@ -258,45 +194,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/FoIBatchRequest'
-            examples:
-              insertFoi:
-                summary: Insert new FoI (CREATE)
-                description: |
-                  INSERT operation: clientId REQUIRED at operation level, foi.id must be ""
-                  Server will return both server id and clientId in response
-                value:
-                  operations:
-                    - operation: insert
-                      clientId: "client-foi-001" 
-                      data:
-                        foi:
-                          id: ""
-                          name: "Meetlocatie Amsterdam"
-                          organisation: "RWS"
-                          code: "LOC001"
-                          description: "Meetlocatie Amsterdam"
-                          location: "https://pdok.nl"
-                          geometry:
-                            type: "Point"
-                            coordinates: [4.9, 52.37]
-              updateFoi:
-                summary: Update existing FoI (UPDATE)
-                description: |
-                  UPDATE operation: foi.id (server) REQUIRED, clientId must be absent
-                value:
-                  operations:
-                    - operation: update
-                      data:
-                        foi:
-                          id: "550e8400-e29b-41d4-a716-446655440002"
-                          name: "Meetlocatie Amsterdam Centraal"
-                          organisation: "RWS"
-                          code: "LOC001"
-                          description: "Meetlocatie Amsterdam Centraal Station"
-                          location: "https://pdok.nl"
-                          geometry:
-                            type: "Point"
-                            coordinates: [4.9, 52.37]
       responses:
         '202':
           description: Batch accepted for processing
@@ -384,35 +281,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/ParameterBatchRequest'
-            examples:
-              insertParameter:
-                summary: Insert new parameter (CREATE)
-                description: |
-                  INSERT operation: clientId REQUIRED at operation level, parameter.id must be ""
-                  Server will return both server id and clientId in response
-                value:
-                  operations:
-                    - operation: insert
-                      clientId: "client-param-001"
-                      data:
-                        parameter:
-                          id: ""
-                          name: "WATHTE"
-                          definition: "https://definities.pdok.nl/def/imkl/1.0/id/waarnemingssoort/WATHTE"
-                          organisation: "RWS"
-              updateParameter:
-                summary: Update existing parameter (UPDATE)
-                description: |
-                  UPDATE operation: parameter.id (server) REQUIRED, clientId must be absent
-                value:
-                  operations:
-                    - operation: update
-                      data:
-                        parameter:
-                          id: "550e8400-e29b-41d4-a716-446655440004"
-                          name: "WATHTE"
-                          definition: "https://definities.pdok.nl/def/imkl/1.0/id/waarnemingssoort/WATHTE"
-                          organisation: "RWS"
       responses:
         '202':
           description: Batch accepted for processing
@@ -500,6 +368,7 @@ components:
         options:
           $ref: '#/components/schemas/BatchOptions'
 
+
     FoIBatchRequest:
       title: FoI Batch Request
       type: object
@@ -552,6 +421,36 @@ components:
           description: Client identifier for the entity (REQUIRED for INSERT operations)
         data:
           $ref: '#/components/schemas/CreateObservationData'
+      examples:
+        insertExample:
+          summary: Insert operation example
+          value:
+            operation: insert
+            clientId: "client-obs-001"
+            data:
+              observation:
+                id: ""
+                type: "measure"
+                resultTime: "2024-01-15T10:00:00Z"
+                phenomenonTime:
+                  begin: "2024-01-15T10:00:00Z"
+                  end: "2024-01-15T10:00:00Z"
+                parameter:
+                  quantity: "WATHTE"
+                  compartment: "OW"
+                  organisation: "RWS"
+                foi:
+                  id: "550e8400-e29b-41d4-a716-446655440002"
+                  code: "location-code"
+                  organisation: "RWS"
+                  description: "Description of the location."
+                  geometry: {}
+                result:
+                  id: "result-001"
+                  measure:
+                    uom: "m"
+                    value: 1.5
+                modifiedOn: "2024-01-15T10:00:00Z"
 
     UpdateObservationOperation:
       title: Update Observation Operation
@@ -567,6 +466,35 @@ components:
           description: The type of operation
         data:
           $ref: '#/components/schemas/UpdateObservationData'
+      examples:
+        updateExample:
+          summary: Update operation example
+          value:
+            operation: update
+            data:
+              observation:
+                id: "550e8400-e29b-41d4-a716-446655440001"
+                type: "measure"
+                resultTime: "2024-01-15T10:00:00Z"
+                phenomenonTime:
+                  begin: "2024-01-15T10:00:00Z"
+                  end: "2024-01-15T10:00:00Z"
+                parameter:
+                  quantity: "WATHTE"
+                  compartment: "OW"
+                  organisation: "RWS"
+                foi:
+                  id: "550e8400-e29b-41d4-a716-446655440002"
+                  code: "location-code"
+                  geometry: {}
+                  organisation: "RWS"
+                  description: "Description of the location."
+                result:
+                  id: "result-001"
+                  measure:
+                    uom: "m"
+                    value: 1.6
+                modifiedOn: "2024-01-15T10:00:00Z"
 
     RetractObservationOperation:
       title: Retract Observation Operation
@@ -582,6 +510,15 @@ components:
           description: The type of operation
         data:
           $ref: '#/components/schemas/RetractObservationData'
+      examples:
+        retractExample:
+          summary: Retract operation example
+          value:
+            operation: retract
+            data:
+              id: "550e8400-e29b-41d4-a716-446655440001"
+              reason: "Ongeldige meting"
+              modifiedOn: "2024-01-15T10:00:00Z"
 
     WriteOperationObservation:
       title: Write Operation for Observation
@@ -621,6 +558,25 @@ components:
           description: Client identifier for the entity (REQUIRED for INSERT operations only)
         data:
           $ref: '#/components/schemas/CreateFoiData'
+      examples:
+        insertExample:
+          summary: Insert operation example
+          value:
+            operation: insert
+            clientId: "client-foi-001"
+            data:
+              foi:
+                id: ""
+                name: "Meetlocatie Amsterdam"
+                organisation: "RWS"
+                code: "LOC001"
+                description: "Meetlocatie Amsterdam"
+                location: "https://pdok.nl"
+                geometry:
+                  type: "Point"
+                  coordinates:
+                      - 4.9
+                      - 52.37
   
     UpdateFoIOperation:
       title: Update FoI Operation
@@ -636,6 +592,24 @@ components:
           description: The type of operation
         data:
           $ref: '#/components/schemas/UpdateFoiData'
+      examples:
+        updateExample:
+          summary: Update operation example
+          value:
+            operation: update
+            data:
+              foi:
+                id: "550e8400-e29b-41d4-a716-446655440002"
+                name: "Meetlocatie Amsterdam Centraal"
+                organisation: "RWS"
+                code: "LOC001"
+                description: "Meetlocatie Amsterdam Centraal Station"
+                location: "https://pdok.nl"
+                geometry:
+                  type: "Point"
+                  coordinates:
+                      - 4.9
+                      - 52.37
 
     WriteOperationFoI:
       title: Write Operation for FoI
@@ -672,6 +646,18 @@ components:
           description: Client identifier for the entity (REQUIRED for INSERT operations only)
         data:
           $ref: '#/components/schemas/CreateParameterData'
+      examples:
+        insertExample:
+          summary: Insert operation example
+          value:
+            operation: insert
+            clientId: "client-param-001"
+            data:
+              parameter:
+                id: ""
+                name: "WATHTE"
+                definition: "https://definities.pdok.nl/def/imkl/1.0/id/waarnemingssoort/WATHTE"
+                organisation: "RWS"
 
     UpdateParameterOperation:
       title: Update Parameter Operation
@@ -687,6 +673,17 @@ components:
           description: The type of operation
         data:
           $ref: '#/components/schemas/UpdateParameterData'
+      examples:
+        updateExample:
+          summary: Update operation example
+          value:
+            operation: update
+            data:
+              parameter:
+                id: "550e8400-e29b-41d4-a716-446655440004"
+                name: "WATHTE"
+                definition: "https://definities.pdok.nl/def/imkl/1.0/id/waarnemingssoort/WATHTE"
+                organisation: "RWS"
 
     WriteOperationParameter:
       title: Write Operation for Parameter
